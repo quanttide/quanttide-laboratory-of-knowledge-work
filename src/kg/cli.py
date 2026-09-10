@@ -10,22 +10,23 @@
 
 契约
   kg new-contract <文件> [--about 路径]   写契约骨架；--about 以某件东西为题
-  kg audit-contract <文件> [--into 案卷]  核对契约；--into 把审查者报告写进案卷
+  kg audit-contract <文件> [--into 报告]  核对契约；--into 把审查者报告写进报告
 
-案卷
-  kg new-dossier <文件> [--about 标题]    写案卷骨架
-  kg audit-dossier <文件>        核对案卷——段位齐全
+报告（事件）
+  kg new-report <文件> [--about 标题]     写报告骨架（事件）
+  kg audit-report <文件>         核对报告——段位齐全
 
 一件事（对象在盘上，动作作用在它身上，事实自动记进流水）
   kg case --list                 有哪些事、各自下一步
   kg case --new <名字>           起一件事
-  kg case <名字>                 看这件事的六格状态与流水
+  kg case <名字>                 看这件事的七格状态与流水
   kg case <名字> --material <路径>   记一条材料（类型 / 阶段 / 时间 / 来源现填）
   kg case <名字> --contract       以记下的材料立契约
-  kg case <名字> --review         跑机械核对，审查者报告写进案卷
+  kg case <名字> --review         跑机械核对，审查者报告写进报告
   kg case <名字> --output <路径>     记一笔产出
   kg case <名字> --decision <话>     写下裁决
-  kg case <名字> --finish         收尾：成果写进案卷
+  kg case <名字> --finish         收尾：产出收束成成果，写进报告
+  kg case <名字> --history <一段话>   写下这件事的来龙去脉（历史：叙事）
   （案子默认落在 <工作区>/cases/，用 --cases 换地方）
 
   kg gui                         开图形界面（同一个程序的窗口版）
@@ -80,8 +81,8 @@ def cmd_new_contract(root: Path, args) -> int:
     return emit(report.new_contract(Path(args.target), args.about))
 
 
-def cmd_new_dossier(root: Path, args) -> int:
-    return emit(report.new_dossier(Path(args.target), args.about))
+def cmd_new_report(root: Path, args) -> int:
+    return emit(report.new_report(Path(args.target), args.about))
 
 
 def cmd_audit_contract(root: Path, args) -> int:
@@ -95,7 +96,7 @@ def cmd_case(root: Path, args) -> int:
         return emit(report.case_new(root, args.name or "", args.cases, args.about))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg case <名字>，或 kg case --list / --new <名字>"]))
-    for action in ("material", "contract", "review", "output", "decision", "finish"):
+    for action in ("material", "contract", "review", "output", "decision", "finish", "history"):
         if getattr(args, action):
             value = value_of(args, action)
             return emit(report.case_step(root, args.name, action, value, args.cases))
@@ -107,13 +108,13 @@ def value_of(args, action: str) -> str:
     given = getattr(args, action)
     if action in ("material", "output"):
         return given if isinstance(given, str) else ""
-    if action == "decision":
+    if action in ("decision", "history"):
         return given if isinstance(given, str) else ""
     return ""
 
 
-def cmd_audit_dossier(root: Path, args) -> int:
-    return emit(report.audit_dossier(Path(args.target)))
+def cmd_audit_report(root: Path, args) -> int:
+    return emit(report.audit_report(Path(args.target)))
 
 
 def cmd_gui(root: Path, args) -> int:
@@ -152,13 +153,13 @@ def build_parser() -> argparse.ArgumentParser:
     contract = sub.add_parser("new-contract", help="写契约骨架")
     contract.add_argument("target", metavar="文件")
     contract.add_argument("--about", default="", metavar="路径", help="以某件已有的东西为题")
-    dossier = sub.add_parser("new-dossier", help="写案卷骨架")
+    dossier = sub.add_parser("new-report", help="写报告骨架")
     dossier.add_argument("target", metavar="文件")
     dossier.add_argument("--about", default="", metavar="标题")
     checking = sub.add_parser("audit-contract", help="核对契约")
     checking.add_argument("target", metavar="文件")
-    checking.add_argument("--into", metavar="案卷", help="把审查者报告写进这份案卷")
-    sub.add_parser("audit-dossier", help="核对案卷").add_argument("target", metavar="文件")
+    checking.add_argument("--into", metavar="报告", help="把审查者报告写进这份报告")
+    sub.add_parser("audit-report", help="核对报告").add_argument("target", metavar="文件")
     case = sub.add_parser("case", help="一件事：起、看、走一步")
     case.add_argument("name", nargs="?", metavar="名字")
     case.add_argument("--list", action="store_true", help="有哪些事、各自下一步")
@@ -171,6 +172,7 @@ def build_parser() -> argparse.ArgumentParser:
     case.add_argument("--output", nargs="?", const=True, metavar="路径")
     case.add_argument("--decision", nargs="?", const=True, metavar="一句话")
     case.add_argument("--finish", action="store_true")
+    case.add_argument("--history", nargs="?", const=True, metavar="一段话")
     sub.add_parser("gui", help="开图形界面")
     return parser
 
@@ -181,9 +183,9 @@ HANDLERS = {
     "audit": cmd_audit,
     "material": cmd_material,
     "new-contract": cmd_new_contract,
-    "new-dossier": cmd_new_dossier,
+    "new-report": cmd_new_report,
     "audit-contract": cmd_audit_contract,
-    "audit-dossier": cmd_audit_dossier,
+    "audit-report": cmd_audit_report,
     "case": cmd_case,
     "gui": cmd_gui,
 }

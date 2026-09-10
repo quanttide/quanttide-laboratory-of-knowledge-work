@@ -13,8 +13,8 @@ src/kg/
 ├── catalog.py   目录层：扫描成名字索引（收文件名与篇内标题）
 ├── checks.py    判据：解析契约里的机械核对并执行
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
-├── records.py   记录的段位与骨架：契约四段、案卷四段
-├── case.py      一件事：案子目录、六格状态机、动作、流水（log.jsonl）
+├── records.py   记录的段位与骨架：契约四段、报告四段（事件）、历史模板（叙事）
+├── case.py      一件事：案子目录（在飞）、七格状态机、动作、流水；报告进 data/report、历史进 data/history
 └── __main__.py  python3 -m kg
 
 tests/test_kg.py       自带测试，26 项（装 PySide6 窗口模块则多 6 项界面冒烟），不依赖 pytest
@@ -58,7 +58,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 **⑥ 审计与导出** —— `kg audit --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg catalog --json`、`kg material --json` 同理，给别的程序读。
 
-**⑦ 一件事成为主界面** —— 案子是盘上的目录（`cases/<名字>/`：case.md、materials.md、contract.md、dossier.md、log.jsonl）；六格状态机决定只摆出该做的那一步；每步都记流水，案卷的审查者报告与最终成果由动作生成，不是手填。窗口默认开在「台面」，工作区动作退到「浏览」。
+**⑦ 一件事成为主界面** —— 一件事的在飞部分是盘上的目录（`cases/<名字>/`：case.md、materials.md、contract.md、log.jsonl），记录按资产进格：报告（事件）进 `data/report/`、历史（叙事）进 `data/history/`；七格状态机决定只摆出该做的那一步；每步都记流水，报告的审查者报告与最终成果由动作生成。窗口默认开在「台面」，工作区动作退到「浏览」。
 
 ## 待办
 

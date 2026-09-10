@@ -70,11 +70,11 @@ def case_file(path: Path, material: str = "", contract: str = "", output: str = 
 def links(real: Path) -> None:
     """动作之间的四条链接：立契约、写案卷、补格子、串成一件事。"""
     with tempfile.TemporaryDirectory() as tmp:
-        dossier = Path(tmp) / "案卷.md"
-        result = report.audit_contract(real, LAB / "samples" / "migration.md", into=dossier)
-        text = dossier.read_text(encoding="utf-8") if dossier.is_file() else ""
-        test("链接①：核对契约把审查者报告写进案卷", result.ok and "## 审查者报告" in text and "✓ 机械：目标侧文件已就位" in text)
-        test("链接①：写出来的案卷自查通过", report.audit_dossier(dossier).ok)
+        target = Path(tmp) / "报告.md"
+        result = report.audit_contract(real, LAB / "samples" / "migration.md", into=target)
+        text = target.read_text(encoding="utf-8") if target.is_file() else ""
+        test("链接①：核对契约把审查者报告写进报告", result.ok and "## 审查者报告" in text and "✓ 机械：目标侧文件已就位" in text)
+        test("链接①：写出来的报告自查通过", report.audit_report(target).ok)
 
         target = Path(tmp) / "契约.md"
         report.new_contract(target, "data/journal/README.md")
@@ -98,15 +98,17 @@ def links(real: Path) -> None:
         report.case_new(root, "试一条路", cases, "把动作串起来")
         start_state = report.case_status(root, "试一条路", cases)
         test("主轴：起案时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
-        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""))
+        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这件事。"))
         marks = []
         for action, given in walk:
             step = report.case_step(root, "试一条路", action, given, cases)
             marks.append([row[1] for row in step.rows].count("✓"))
-        test("主轴：六步顺次点亮", marks == [1, 2, 3, 4, 5, 6], f"实得 {marks}")
+        test("主轴：七步顺次点亮", marks == [1, 2, 3, 4, 5, 6, 7], f"实得 {marks}")
         case = case_layer.open_case(root, "试一条路", cases)
-        test("主轴：流水记满七条", len(case.events()) == 7, f"实得 {len(case.events())}")
-        test("主轴：案卷四段都是真的", all(case.dossier().get(name) for name in records.DOSSIER_SECTIONS), str(case.dossier().keys()))
+        test("主轴：流水记满八条", len(case.events()) == 8, f"实得 {len(case.events())}")
+        test("主轴：报告四段都是真的", all(case.report().get(name) for name in records.REPORT_SECTIONS), str(case.report().keys()))
+        test("主轴：报告进 data/report、历史进 data/history", case.record_file("report").is_relative_to(root / "data" / "report") and records.prose(case.record_file("history")) != "")
+        test("主轴：这两格审计认得", "未登记" not in "".join(report.audit(root).lines) or "report" not in "".join(report.audit(root).lines))
         test("主轴：认不得的步骤挡住", not report.case_step(root, "试一条路", "乱来", "", cases).ok)
         test("主轴：列案子报下一步", report.case_list(root, cases).rows[0][1] == "完成")
         test("主轴：案子进得了目录", "试一条路" in "".join(row[0] for row in report.case_list(root, cases).rows))
@@ -140,7 +142,8 @@ def gui_smoke(real: Path) -> None:
     browser.select_action("找文档")
     test("界面：空输入先拦住", not browser.run_current().ok)
     groups = [spec.group for spec in gui.SPECS]
-    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "契约", "契约", "案卷", "案卷"], str(groups))
+    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "契约", "契约", "报告", "报告"], str(groups))
+    test("台面：七步都在", len(gui.STEPS) == 7 and gui.STEPS[-1][0] == "历史")
 
     with tempfile.TemporaryDirectory() as tmp:
         fake = fake_repo(Path(tmp) / "desk")
@@ -200,7 +203,8 @@ def main() -> int:
         test("检查项：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
 
     test("记录的段位取自同一处", records.CONTRACT_SECTIONS == ("目标", "输出形态", "必须包含", "检查项"), "契约四段")
-    test("案卷段位是四段", len(records.DOSSIER_SECTIONS) == 4, "产出 / 审查 / 裁决 / 成果")
+    test("报告段位是四段（事件）", records.REPORT_SECTIONS == ("生成者产出", "审查者报告", "人类裁决", "最终成果"), str(records.REPORT_SECTIONS))
+    test("历史是叙事不是段位", "##" not in records.HISTORY_PLACEHOLDER)
 
     with tempfile.TemporaryDirectory() as tmp:
         root = fake_repo(Path(tmp) / "materials")

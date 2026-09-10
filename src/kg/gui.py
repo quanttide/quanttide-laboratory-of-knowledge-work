@@ -50,7 +50,8 @@ STEPS = (
     ("核对", "review", "跑机械核对，结果写进案卷"),
     ("产出", "output", "记一笔产出"),
     ("裁决", "decision", "写下裁决"),
-    ("成果", "finish", "收尾：成果写进案卷"),
+    ("成果", "finish", "收尾：产出收束成成果，写进报告"),
+    ("历史", "history", "写这件事的来龙去脉——报告记事，历史叙事"),
 )
 
 
@@ -90,9 +91,9 @@ SPECS = (
     Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, value(v, "名字"), bool(v.get("看正文")))),
     Spec("查看", "看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
     Spec("契约", "写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_contract(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
-    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件", "写入案卷（可留空）"), lambda root, v: report.audit_contract(root, Path(value(v, "契约文件")), Path(value(v, "写入案卷（可留空）")) if value(v, "写入案卷（可留空）") else None)),
-    Spec("案卷", "写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_dossier(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
-    Spec("案卷", "核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(value(v, "案卷文件")))),
+    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件", "写入报告（可留空）"), lambda root, v: report.audit_contract(root, Path(value(v, "契约文件")), Path(value(v, "写入报告（可留空）")) if value(v, "写入报告（可留空）") else None)),
+    Spec("报告", "写报告骨架", "生成者产出 / 审查者报告 / 人类裁决 / 最终成果", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_report(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
+    Spec("报告", "核对报告", "四段齐不齐", ("报告文件",), lambda root, v: report.audit_report(Path(value(v, "报告文件")))),
 )
 
 CAN_ABOUT = ("目录", "找文档", "看材料")
@@ -198,7 +199,7 @@ class Browser(QWidget):
             if field in ("看正文", "补建缺的资产"):
                 widget = QCheckBox()
                 self.widgets[field] = widget
-            elif optional(field).endswith("文件") or optional(field) in ("以它为题", "写入案卷"):
+            elif optional(field).endswith("文件") or optional(field) in ("以它为题", "写入报告"):
                 widget = self._with_browse(field)
             else:
                 widget = QLineEdit()
@@ -222,7 +223,7 @@ class Browser(QWidget):
         button = QPushButton("浏览…")
 
         def choose() -> None:
-            if optional(field) in ("目标文件", "写入案卷"):
+            if optional(field) in ("目标文件", "写入报告"):
                 path, _ = QFileDialog.getSaveFileName(self, "写到哪", str(self.root), "Markdown (*.md)")
             else:
                 path, _ = QFileDialog.getOpenFileName(self, "选文件", str(self.root), "Markdown (*.md)")
@@ -460,8 +461,10 @@ class Desk(QWidget):
                 return None
             candidate = Path(path)
             return report.short(self.root, candidate) if candidate.is_relative_to(self.root) else path
-        if action == "decision":
-            words, ok = QInputDialog.getMultiLineText(self, "裁决", "谁拍的板、决定是什么")
+        if action in ("decision", "history"):
+            title = "裁决" if action == "decision" else "历史"
+            prompt = "谁拍的板、决定是什么" if action == "decision" else "这件事的来龙去脉（报告记事，历史叙事）"
+            words, ok = QInputDialog.getMultiLineText(self, title, prompt)
             return words.strip() if ok else None
         return ""
 
@@ -473,7 +476,7 @@ class Desk(QWidget):
         case = case_layer.create(self.root, name.strip(), self.cases, about.strip() if ok else "")
         self.case = case
         self.reload()
-        self.window().statusBar().showMessage(f"起了：{case.path}")
+        self.window().statusBar().showMessage(f"起了：{case.dir}")
 
 
 class Window(QMainWindow):

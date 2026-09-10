@@ -20,7 +20,7 @@ from . import records
 
 MECHANICAL = ("核对", "结论", "说明")
 SECTIONS = ("段位", "结论")
-STEPS = ("material", "contract", "review", "output", "decision", "finish")
+STEPS = ("material", "contract", "review", "output", "decision", "finish", "history")
 
 
 @dataclass
@@ -155,8 +155,8 @@ def new_contract(target: Path, about: str = "") -> Result:
     return new_record(target, "契约", about)
 
 
-def new_dossier(target: Path, about: str = "") -> Result:
-    return new_record(target, records.dossier_template(about), about)
+def new_report(target: Path, title: str = "") -> Result:
+    return new_record(target, records.report_template(title), title)
 
 
 def audit_contract(root: Path, target: Path, into: Path | None = None) -> Result:
@@ -187,34 +187,34 @@ def audit_contract(root: Path, target: Path, into: Path | None = None) -> Result
     return result
 
 
-def write_review(dossier: Path, results: list, gates: list) -> Path:
+def write_review(target: Path, results: list, gates: list) -> Path:
     """把机械核对与闸门项写进案卷的「审查者报告」一节（没有案卷就先起一份）。"""
-    if not dossier.is_file():
-        dossier.parent.mkdir(parents=True, exist_ok=True)
-        dossier.write_text(records.DOSSIER_TEMPLATE, encoding="utf-8")
+    if not target.is_file():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(records.report_template(target.stem), encoding="utf-8")
     body = [f"- {'✓' if ok else '✗'} {item.note}" for item, ok, _ in results]
     body += [f"- ⧗ {item.note}（留给闸门）" for item in gates]
-    lines = dossier.read_text(encoding="utf-8").splitlines()
+    lines = target.read_text(encoding="utf-8").splitlines()
     start = next((i for i, line in enumerate(lines) if line.startswith("## ") and line[3:].strip() == "审查者报告"), None)
     if start is None:
         lines += ["", "## 审查者报告", "", *body]
     else:
         end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
         lines = lines[: start + 1] + [""] + body + [""] + lines[end:]
-    dossier.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-    return dossier
+    target.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return target
 
 
-def audit_dossier(target: Path) -> Result:
+def audit_report(target: Path) -> Result:
     if not str(target).strip():
-        return Result(ok=False, lines=["请先选案卷文件"])
+        return Result(ok=False, lines=["请先选报告文件"])
     if not target.is_file():
         return Result(ok=False, lines=[f"没有这个文件：{target}"])
-    missing = records.missing_sections(target, records.DOSSIER_SECTIONS)
+    missing = records.missing_sections(target, records.REPORT_SECTIONS)
     result = Result(ok=not missing, columns=SECTIONS)
-    result.rows = [(name, "✓" if name not in missing else "✗") for name in records.DOSSIER_SECTIONS]
+    result.rows = [(name, "✓" if name not in missing else "✗") for name in records.REPORT_SECTIONS]
     result.lines += [f"  {mark} {name}" for name, mark in result.rows]
-    result.lines.append("案卷完整。" if not missing else f"案卷不完整：缺 {'、'.join(missing)}")
+    result.lines.append("报告完整。" if not missing else f"报告不完整：缺 {'、'.join(missing)}")
     return result
 
 
@@ -227,7 +227,7 @@ def case_new(root: Path, name: str, cases: str | None = None, about: str = "") -
     if not name.strip():
         return Result(ok=False, lines=["请先给这件事起个名字"])
     case = case_layer.create(root, name.strip(), cases, about)
-    return Result(lines=[f"起了：{case.path}", case_layer.state_line(case)])
+    return Result(lines=[f"起了：{case.dir}", case_layer.state_line(case)])
 
 
 def case_status(root: Path, name: str, cases: str | None = None) -> Result:
@@ -235,13 +235,14 @@ def case_status(root: Path, name: str, cases: str | None = None) -> Result:
         return Result(ok=False, lines=["请先选一件事（kg case --list 看有哪些）"])
     case = case_layer.open_case(root, name, cases)
     if not case.exists():
-        return Result(ok=False, lines=[f"没有这件事：{case.path}"])
+        return Result(ok=False, lines=[f"没有这件事：{case.dir}"])
     state = case.stages()
     result = Result(columns=STEP_COLUMNS)
     result.rows = [(stage, "✓" if state[stage] else "—") for stage in case_layer.STAGES]
-    result.lines = [f"一件事：{case.name}（{case.path}）"]
+    result.lines = [f"一件事：{case.name}（{case.dir}）"]
     result.lines += [f"  {'✓' if state[s] else '—'} {s}" for s in case_layer.STAGES]
     result.lines.append(case_layer.state_line(case))
+    result.lines.append(f"报告：{short(root, case.record_file(case_layer.REPORT))}　历史：{short(root, case.record_file(case_layer.HISTORY))}")
     events = case.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")
@@ -254,7 +255,7 @@ def case_list(root: Path, cases: str | None = None) -> Result:
     result = Result(columns=("一件事", "下一步", "位置"))
     for case in found:
         action, _ = case.next_action()
-        result.rows.append((case.name, action, short(root, case.path)))
+        result.rows.append((case.name, action, short(root, case.dir)))
         result.lines.append(f"{case.name:24} 下一步：{action}")
     if not found:
         result.lines = ["还没有一件事：kg case --new <名字>"]
@@ -265,7 +266,7 @@ def case_step(root: Path, name: str, action: str, value: str = "", cases: str | 
     """在一件事上走一步；事实自动记进它的流水。"""
     case = case_layer.open_case(root, name, cases)
     if not case.exists():
-        return Result(ok=False, lines=[f"没有这件事：{case.path}"])
+        return Result(ok=False, lines=[f"没有这件事：{case.dir}"])
 
     if action == "material":
         if not value.strip():
@@ -276,7 +277,7 @@ def case_step(root: Path, name: str, action: str, value: str = "", cases: str | 
         mat = material_layer.as_material(root, path)
         rel = short(root, path)
         fields = f"{mat.type} / {mat.stage} / {mat.created_at or '（缺时间）'} / {mat.source}"
-        case_layer.add_material(case, root, rel, fields)
+        case_layer.add_material(case, rel, fields)
         message = f"记下材料：{rel}"
     elif action == "contract":
         about = value.strip() or (case.items(case_layer.MATERIALS)[0].split("　")[0].strip("`") if case.items(case_layer.MATERIALS) else "")
@@ -284,7 +285,7 @@ def case_step(root: Path, name: str, action: str, value: str = "", cases: str | 
         message = f"写好契约：{short(root, case.file(case_layer.CONTRACT))}" + (f"（以 {about} 为题）" if about else "")
     elif action == "review":
         ok, lines = case_layer.review(case, root)
-        message = "核对完了，审查者报告已写进案卷" if ok else "核对没过：" + "；".join(lines[:2])
+        message = f"核对完了，审查者报告已写进 {short(root, case.record_file(case_layer.REPORT))}" if ok else "核对没过：" + "；".join(lines[:2])
         case_after = case_status(root, name, cases)
         case_after.lines.insert(0, message)
         return case_after
@@ -298,10 +299,15 @@ def case_step(root: Path, name: str, action: str, value: str = "", cases: str | 
         if not value.strip():
             return Result(ok=False, lines=["裁决得写句话：谁拍的板、决定是什么"])
         case_layer.decide(case, value.strip())
-        message = "裁决已记入案卷"
+        message = "裁决已记入报告"
     elif action == "finish":
-        items = case_layer.finish(case, root)
-        message = f"成果已写进案卷：{len(items)} 项"
+        items = case_layer.finish(case)
+        message = f"成果已收束进报告：{len(items)} 项"
+    elif action == "history":
+        if not value.strip():
+            return Result(ok=False, lines=[f"历史要你来写：{short(root, case.record_file(case_layer.HISTORY))}"])
+        case_layer.narrate(case, value)
+        message = f"历史记下一段：{short(root, case.record_file(case_layer.HISTORY))}"
     else:
         return Result(ok=False, lines=[f"不认得这一步：{action}"])
 

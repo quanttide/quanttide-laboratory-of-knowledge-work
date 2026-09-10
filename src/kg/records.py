@@ -1,13 +1,15 @@
-"""记录的样子：契约、案卷、一件事的段位与骨架。
+"""记录的样子：契约、报告、历史的段位与骨架。
 
 段位是程序唯一的说法——工具核对、模板生成都从这里取，不在别处再写一遍。
+报告侧重事件（谁做的、审了什么、谁拍板、交出什么），机器可生成；
+历史侧重叙事，人写。
 """
 
 from pathlib import Path
 
 CONTRACT_SECTIONS = ("目标", "输出形态", "必须包含", "检查项")
-DOSSIER_SECTIONS = ("生成者产出", "审查者报告", "人类裁决", "最终成果")
-CASE_SECTIONS = ("材料", "契约", "产出", "案卷")
+REPORT_SECTIONS = ("生成者产出", "审查者报告", "人类裁决", "最终成果")
+HISTORY_PLACEHOLDER = "（这件事的来龙去脉，你写）"
 
 CONTRACT_TEMPLATE = """# 契约：<一句话说清要什么>
 
@@ -31,43 +33,20 @@ CONTRACT_TEMPLATE = """# 契约：<一句话说清要什么>
 - [ ] 闸门：落点与源位置同构
 """
 
-DOSSIER_TEMPLATE = """# 案卷：<一句话说清这是哪一件事>
+REPORT_TEMPLATE = """# 报告：{title}
 
 ## 生成者产出
 
-- <谁、按哪份契约、交了什么>
-
 ## 审查者报告
-
-- ✓ <机械核对通过的项>
-- ⧗ <留给闸门的项>
 
 ## 人类裁决
 
-<谁拍的板、决定是什么>
-
 ## 最终成果
-
-- <最后交出什么、落在哪>
 """
 
-CASE_TEMPLATE = """# 一件事：<一句话说清这是哪件事>
+HISTORY_TEMPLATE = """# 历史：{title}
 
-## 材料
-
-- `<还没做成成品的输入，如 data/journal/2026-09-10.md>`
-
-## 契约
-
-- `<约定要什么、怎么验收>`
-
-## 产出
-
-- `<做出来的东西落在哪>`
-
-## 案卷
-
-- `<这次交付的记录>`
+{placeholder}
 """
 
 
@@ -79,21 +58,16 @@ def contract_template(about: str = "") -> str:
     return text.replace("- <要素一>", f"- 来源：`{about}`")
 
 
-def dossier_template(about: str = "") -> str:
-    return DOSSIER_TEMPLATE.replace("<一句话说清这是哪一件事>", about) if about else DOSSIER_TEMPLATE
+def report_template(title: str = "") -> str:
+    return REPORT_TEMPLATE.format(title=title or "<一件事的名字>")
 
 
-def case_template(about: str = "") -> str:
-    return CASE_TEMPLATE.replace("<一句话说清这是哪件事>", about) if about else CASE_TEMPLATE
-
-
-def sections(path: Path) -> set[str]:
-    """文件里真的写了哪几段。"""
-    return set(read_sections(path))
+def history_template(title: str = "") -> str:
+    return HISTORY_TEMPLATE.format(title=title or "<一件事的名字>", placeholder=HISTORY_PLACEHOLDER)
 
 
 def read_sections(path: Path) -> dict[str, list[str]]:
-    """按二级标题切段，段里的条目取成列表（空行与非条目的散句都不算）。"""
+    """按二级标题切段，段里的条目取成列表（空行、散句与模板占位都不算）。"""
     text: dict[str, list[str]] = {}
     current = ""
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -102,12 +76,26 @@ def read_sections(path: Path) -> dict[str, list[str]]:
             text[current] = []
         elif current and line.strip().startswith("- "):
             item = line.strip()[2:].strip()
-            if item and "<" not in item:  # 模板里的占位（<…>）不算数
+            if item and "<" not in item:
                 text[current].append(item)
     return text
 
 
+def prose(path: Path) -> str:
+    """正文：去掉标题与占位行之后剩下的那些话。"""
+    lines = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("# ") or stripped.startswith("## ") or stripped == HISTORY_PLACEHOLDER:
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)
+
+
+def sections(path: Path) -> set[str]:
+    return set(read_sections(path))
+
+
 def missing_sections(path: Path, required: tuple[str, ...]) -> list[str]:
-    """该有而没有的段位。"""
     found = set(read_sections(path))
     return [name for name in required if name not in found]
