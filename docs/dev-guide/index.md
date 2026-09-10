@@ -9,8 +9,8 @@ src/
 ├── kit/            唯一入口：七个动作（find / list / check / 契档案卷骨架 / 契约核对 / 案卷核对）
 │   └── checks.py   检查项：从契约文件读判据并执行
 ├── resolver/       契约与目录两层库：contract.py（应该有什么）、catalog.py（实际有什么）
-├── contract/       契约结构化实验：Contract / Check 与真实迁移契约
-├── dossier/        案卷字段化实验：真实交付的案卷（dossier.md）
+├── contract/       契约样本：真实迁移契约（migration.md），kit 可核对
+├── dossier/        案卷样本：真实交付的案卷（dossier.md），kit 可核对
 ├── material/       材料字段确认：四字段试装（已完成验证）
 └── tests/          最小测试：真实仓库 + 临时假仓库两套夹具
 ```
@@ -51,7 +51,15 @@ src/
 
 **⑥ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：七个动作在真实仓库上稳定跑通；有测试守着；契约与案卷的格式被真实交付用过至少一次（不是只有样例）。
 
-**待决** —— `contract/` 与 `dossier/` 两个实验的代码与 `kit` 有所重叠（结构各写了一遍）。要么让 `kit` 复用它们的 `Contract` / `Dossier` 结构，要么在格式定型后把实验收成样本、代码删掉。现在留着，因为样本本身有判例价值。
+## 已决：重叠怎么处理
+
+`contract/` 与 `dossier/` 原先各有一份代码（Python 对象版的结构），与 `kit` 重复。决定是**删代码、留样本**：
+
+- **结构只由 `kit` 拥有**——同一套四段写在两处就是两份事实源，改一处忘一处；
+- **样本是判例，代码不是**——那份迁移契约与那件案卷记的是真事，将来能查；Python 版的 `Contract` / `Dossier` 没有独有能力（判据现在写进契约文件，`run:` 还能跑命令）；
+- **样本自证格式**——`kg audit-contract src/contract/migration.md` 与 `kg audit-dossier src/dossier/dossier.md` 当场核对通过，格式在真事上验证过，不是只在样例上成立。
+
+判据里的路径相对仓库根；写绝对路径则按绝对路径（跨仓库核对用）。
 
 ## 不做的事
 
