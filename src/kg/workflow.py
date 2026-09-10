@@ -13,10 +13,10 @@
       description: 把两边的源找齐
       executor: 智能体
       criteria:
-        - type: rule
+        - executor: rule
           description: 个人课程档案在
           path: data/profile/iGuo/course/index.md
-        - type: human
+        - executor: human
           description: 创始人点头（回流与并法怎么定）
 """
 
@@ -31,7 +31,7 @@ EXECUTORS = (AGENT, HUMAN)
 TYPES = (RULE, AGENT, HUMAN)
 TOP_FIELDS = ("name", "description", "steps")
 STEP_FIELDS = ("name", "description", "executor", "criteria")
-CRITERION_FIELDS = ("type", "description", "path", "absent", "file", "contains", "run")
+CRITERION_FIELDS = ("executor", "description", "path", "absent", "file", "contains", "run")
 
 
 def lab_data() -> Path:
@@ -77,12 +77,12 @@ def load(path: Path) -> dict:
             raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 criteria 应当是列表")
         for order, criterion in enumerate(criteria, start=1):
             where = f"第 {index} 个步骤第 {order} 条判据"
-            if not isinstance(criterion, dict) or criterion.get("type") not in TYPES:
-                raise WorkflowError(f"{Path(path).name} {where}的 type 只能是 {' / '.join(TYPES)}")
+            if not isinstance(criterion, dict) or criterion.get("executor") not in TYPES:
+                raise WorkflowError(f"{Path(path).name} {where}的 executor 只能是 {' / '.join(TYPES)}（谁判：规则引擎 / 智能体 / 人）")
             odd = [key for key in criterion if key not in CRITERION_FIELDS]
             if odd:
                 raise WorkflowError(f"{Path(path).name} {where}有不认识的字段：{'、'.join(odd)}（只认 {'、'.join(CRITERION_FIELDS)}）")
-            kind = criterion["type"]
+            kind = criterion["executor"]
             given = [name for name in ("path", "absent", "file", "contains", "run") if name in criterion]
             if kind == RULE:
                 if not given:
@@ -130,7 +130,7 @@ class Step:
         return list(self.payload.get("criteria") or [])
 
     def of(self, kind: str) -> list[dict]:
-        return [criterion for criterion in self.criteria if criterion.get("type") == kind]
+        return [criterion for criterion in self.criteria if criterion.get("executor") == kind]
 
     @property
     def rules(self) -> list[dict]:
@@ -191,8 +191,8 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
                 "description": f"<{step}这一步做什么>",
                 "executor": AGENT,
                 "criteria": [
-                    {"type": RULE, "path": "data/journal/README.md"},
-                    {"type": HUMAN, "description": "<只能人拍板的>"},
+                    {"executor": RULE, "path": "data/journal/README.md"},
+                    {"executor": HUMAN, "description": "<只能人拍板的>"},
                 ],
             }
             for step in steps

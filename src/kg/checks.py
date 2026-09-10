@@ -2,14 +2,14 @@
 
 规则引擎的判据是**字段**，不是一行小语法：
 
-  - type: rule
+  - executor: rule
     path: docs/index.md            # 路径存在
-  - type: rule
+  - executor: rule
     absent: docs/old.md            # 路径不存在
-  - type: rule
+  - executor: rule
     file: docs/index.md            # 文件含这段文字（file + contains 成对）
     contains: 第二大脑
-  - type: rule
+  - executor: rule
     run: test -f docs/index.md     # 命令在工作区根跑，退出码为零
 
 路径相对工作区根；写绝对路径则按绝对路径（跨仓库核对用）。
@@ -68,7 +68,7 @@ def items_of(criteria: list[dict]) -> list[Item]:
     items: list[Item] = []
     for criterion in criteria:
         description = description_of(criterion)
-        if criterion.get("type") != "rule":
+        if criterion.get("executor") != "rule":
             items.append(Item(description))
             continue
         if "path" in criterion:

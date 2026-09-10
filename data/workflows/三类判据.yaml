@@ -4,11 +4,11 @@ steps:
 - name: 写一句
   executor: agent
   criteria:
-  - type: rule
-    path: examples/default/data/artifacts/三类判据/话.md
+  - path: examples/default/data/artifacts/三类判据/话.md
     description: 话落在
-  - type: agent
-    description: 内容是中文且只有一行
-  - type: human
-    description: 创始人认可
+    executor: rule
+  - description: 内容是中文且只有一行
+    executor: agent
+  - description: 创始人认可
+    executor: human
   description: 在 examples/default/data/artifacts/三类判据/话.md 里写一行中文（就一行）

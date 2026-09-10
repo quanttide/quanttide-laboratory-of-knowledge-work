@@ -102,12 +102,12 @@ def workspace(real: Path) -> None:
 def judges(real: Path) -> None:
     """判据：结构化字段（机械带 spec、闸门只有说明），四种 spec 都能跑。"""
     defined = [
-        {"type": "rule", "description": "目标侧文件已就位", "path": "data/journal/README.md"},
-        {"type": "rule", "description": "旧文件已删除", "absent": "gone.md"},
-        {"type": "rule", "description": "含某段文字", "file": "data/journal/README.md", "contains": "日志"},
-        {"type": "rule", "description": "命令跑得通", "run": "test -f data/journal/README.md"},
-        {"type": "rule", "path": "data/journal"},
-        {"type": "human", "description": "落点与源位置同构"},
+        {"executor": "rule", "description": "目标侧文件已就位", "path": "data/journal/README.md"},
+        {"executor": "rule", "description": "旧文件已删除", "absent": "gone.md"},
+        {"executor": "rule", "description": "含某段文字", "file": "data/journal/README.md", "contains": "日志"},
+        {"executor": "rule", "description": "命令跑得通", "run": "test -f data/journal/README.md"},
+        {"executor": "rule", "path": "data/journal"},
+        {"executor": "human", "description": "落点与源位置同构"},
     ]
     with tempfile.TemporaryDirectory() as inner:
         root = Path(inner) / "repo"
@@ -141,8 +141,8 @@ def flow_and_task(real: Path) -> None:
         step = payload["steps"][1]
         step["description"] = "把两边比一遍"
         step["criteria"] = [
-            {"type": "rule", "description": "日志在", "path": "data/journal/README.md"},
-            {"type": "human", "description": "创始人过目"},
+            {"executor": "rule", "description": "日志在", "path": "data/journal/README.md"},
+            {"executor": "human", "description": "创始人过目"},
         ]
         flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
         flow.reload()

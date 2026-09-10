@@ -68,7 +68,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 **⑨ 工作流可带走** —— `kg workflow --export <文件>` 原样存一份；`--import <文件> [--as 名字]` 导回来（先验「有没有 `### 步骤`」，重名挡、`--as` 换名）。换机器、换 `--data`、换仓库都能接着用；判据里的路径是那边的，导完要自己核一遍。
 
-**⑩ 定义用 YAML，判据分三类** —— 工作流与任务改成 YAML，`workflow.py` 带**严格** schema（不认识的字段报错）；判据按主体分三类：`rule` 由规则引擎按字段判（`checks.items_of` → `checks.run`）、`agent` 由智能体照判准审（`task.py` 的 `judge_by_ai`）、`human` 留给人。判据字段化后，那套 `contains:文件=文字` 的小语法删了。报告/历史仍是 Markdown、流水是 JSONL。
+**⑩ 定义用 YAML，判据分三类** —— 工作流与任务改成 YAML，`workflow.py` 带**严格** schema（不认识的字段报错）；判据按主体分三类（判据的 `executor`）：`rule` 由规则引擎按字段判（`checks.items_of` → `checks.run`）、`agent` 由智能体照判准审（`task.py` 的 `judge_by_ai`）、`human` 留给人。判据字段化后，那套 `contains:文件=文字` 的小语法删了。报告/历史仍是 Markdown、流水是 JSONL。
 
 **⑪ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：动作在真实工作区上稳定跑通；测试守着；任务的格式（三段）被真实交付用过至少一次（已有一件）。
 

@@ -19,7 +19,7 @@ steps:
     description: 把两边的源找齐
     executor: agent             # agent | human；默认 agent
     criteria:
-      - type: rule              # rule：规则引擎按字段判（看什么 + 要什么）
+      - executor: rule          # rule：规则引擎按字段判（看什么 + 要什么）
         note: 个人课程档案在
         path: data/profile/iGuo/course/index.md
       - type: rule
@@ -32,28 +32,28 @@ steps:
       - type: rule
         note: 产物落成
         path: examples/default/data/artifacts/课程档案比对/比对.md
-      - type: rule              # 文件含这段文字（file + contains 成对）
+      - executor: rule          # 文件含这段文字（file + contains 成对）
         file: examples/default/data/artifacts/课程档案比对/比对.md
         contains: "## 结论"
-      - type: agent             # agent：智能体照 note 的判准审
+      - executor: agent         # agent：智能体照 description 的判准审
         note: 两边口径是否对齐
-      - type: human             # human：留给人拍板
+      - executor: human         # human：留给人拍板
         note: 创始人点头（回流与并法怎么定）
 ```
 
-**谁判，按主体分三类**（`type`，取值英文标识）：
+**谁判，按主体分三类**（判据的 `executor`，取值英文标识——和步骤的 `executor` 同一个词：「谁承担」）：
 
-| type | 谁判 | 怎么判 |
+| executor | 谁判 | 怎么判 |
 |---|---|---|
 | `rule` | 规则引擎（程序） | 按**字段**判，四种判法：`path:` 存在 / `absent:` 不存在 / `file:` + `contains:` 文件含这段文字 / `run:` 命令退出码为零；路径相对工作区根（绝对路径则按绝对路径，跨仓库核对用）。`note` 可省——省了由程序按字段拼一句 |
 | `agent` | 智能体 | 程序把产物与 `note`（判准）交给 `pi -p`，要它逐条回答「通过 / 不通过 + 一句理由」 |
 | `human` | 人类 | 不跑，原样进报告的「闸门项」等人拍板 |
 
-**谁做**（`executor`）也是这两类：`agent`（默认）或 `human`。
+**谁做**（步骤的 `executor`）是这两类：`agent`（默认）或 `human`。同一个 `executor` 出现在两层：步骤上答「谁做」，判据上答「谁判」（多一个 `rule`）。
 
 三处都叫 `description`，各说一层：顶层描述整条工作流、步骤描述这一步做什么（执行者照它干）、判据描述这一条是什么（`agent` / `human` 那格就是判准与拍板事项）。
 
-不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / description / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `note` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
+不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / description / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `description` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
 
 **可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者与判据主体——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 
