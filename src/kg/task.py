@@ -315,6 +315,6 @@ def narrate(task: Task, words: str) -> None:
 def state_line(task: Task) -> str:
     steps = task.steps()
     if not steps:
-        return f"这条工作流没有步骤——在 workflows/{task.workflow_name()}.md 里写「### 步骤名」"
+        return f"这条工作流没有步骤——在 workflows/{task.workflow_name()}.yaml 的 steps 里写步骤"
     step = task.next_step()
     return f"下一步：{step.name}" if step else f"{len(steps)} 个步骤都走过了"

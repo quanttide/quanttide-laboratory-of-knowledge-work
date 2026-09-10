@@ -218,13 +218,16 @@ def task_status(root: Path, data: Path, name: str) -> Result:
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     done = task.done()
-    result = Result(columns=("步骤", "状态"), lines=[f"任务：{task.name}（工作流：{task.workflow_name()}）"])
+    result = Result(columns=("步骤", "状态"), lines=[f"任务：{task.name}"])
+    result.lines.append(f"  目标：{task.goal() or '（没写）'}")
+    result.lines.append(f"  工作流：{task.workflow_name()}（{len(task.steps())} 个步骤）")
     for step in task.steps():
         state = "✓" if step.name in done else "—"
         result.rows.append((step.name, state))
         result.lines.append(f"  {state} {step.name}")
     result.lines.append(task_layer.state_line(task))
-    result.lines.append(f"产物：{short(data, task.artifact(task_layer.REPORT))}、{short(data, task.artifact(task_layer.JOURNAL))}")
+    result.lines.append(f"指令：{short(data, task.file)}")
+    result.lines.append(f"产物：{short(data, task.artifact(task_layer.REPORT))}、{short(data, task.artifact(task_layer.JOURNAL))}　流水：{short(data, task.artifact(task_layer.LOG))}")
     events = task.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")

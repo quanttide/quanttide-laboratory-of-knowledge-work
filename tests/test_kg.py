@@ -161,6 +161,9 @@ def flow_and_task(real: Path) -> None:
         task = task_layer.open_task(root, data, "试一次")
         test("任务：一件任务一个文件，指向工作流", task.file.is_file() and task.workflow_name() == "试一条", task.workflow_name())
         test("任务：状态按工作流列步骤", [row[0] for row in started.rows] == ["定位", "比对", "结论"])
+        test("任务：状态里看得到指令（目标 / 工作流 / 指令文件）",
+             any("目标：把纪律落下来" in line for line in started.lines) and any("工作流：试一条" in line for line in started.lines) and any("指令：" in line for line in started.lines),
+             str(started.lines[:4]))
         test("任务：起时记一笔", len(task.events()) == 1)
         auto = report.task_step(root, data, "试一次", "", auto=True)  # 默认执行者是 AI，交给 pi
         test("走一步：默认交给智能体跑", bool(calls) and "这一步：定位" in calls[0], str(calls[:1])[:60])
