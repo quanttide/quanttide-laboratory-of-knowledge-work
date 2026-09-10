@@ -8,20 +8,19 @@
   材料（输入）→ 以它立契约 → 核对契约（审查者报告）→ 写进案卷 → 成果登记回工作区。
 """
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import assets as assets_layer
 from . import catalog as catalog_layer
+from . import case as case_layer
 from . import checks as checks_layer
 from . import material as material_layer
 from . import records
 
 MECHANICAL = ("核对", "结论", "说明")
 SECTIONS = ("段位", "结论")
-CASE_COLUMNS = ("段", "条数", "状态")
-LINK = re.compile(r"`([^`]+)`")
+STEPS = ("material", "contract", "review", "output", "decision", "finish")
 
 
 @dataclass
@@ -221,56 +220,91 @@ def audit_dossier(target: Path) -> Result:
 
 # ---- 主轴：一件事 ----
 
-
-def case_new(target: Path, about: str = "") -> Result:
-    return new_record(target, records.case_template(about))
+STEP_COLUMNS = ("段", "状态")
 
 
-def case(root: Path, target: Path) -> Result:
-    """看一件事走到哪一步：四段各引用了什么、有没有断链、下一步该做什么。"""
-    if not str(target).strip():
-        return Result(ok=False, lines=["请先选一件事的文件"])
-    if not target.is_file():
-        return Result(ok=False, lines=[f"没有这个文件：{target}"])
-    missing = records.missing_sections(target, records.CASE_SECTIONS)
-    result = Result(ok=not missing, columns=CASE_COLUMNS, lines=[f"一件事：{target}"])
-    if missing:
-        result.lines.append(f"少段：{'、'.join(missing)}")
-    sections = records.read_sections(target)
-    broken = []
-    for name in records.CASE_SECTIONS:
-        items = [item for item in sections.get(name, []) if item]
-        dead = [item for item in items if (rel := LINK.search(item)) and not here(root, rel.group(1)).exists()]
-        broken += dead
-        if dead:
-            status = "断链：" + "、".join(LINK.search(item).group(1) for item in dead)
-            result.ok = False
-        elif items:
-            status = "在"
-        else:
-            status = "空"
-        result.lines.append(f"{name}：{len(items)} 条——{status}")
-        result.rows.append((name, str(len(items)), status))
-    result.lines.append("下一步：" + next_step(sections, broken))
+def case_new(root: Path, name: str, cases: str | None = None, about: str = "") -> Result:
+    if not name.strip():
+        return Result(ok=False, lines=["请先给这件事起个名字"])
+    case = case_layer.create(root, name.strip(), cases, about)
+    return Result(lines=[f"起了：{case.path}", case_layer.state_line(case)])
+
+
+def case_status(root: Path, name: str, cases: str | None = None) -> Result:
+    if not name.strip():
+        return Result(ok=False, lines=["请先选一件事（kg case --list 看有哪些）"])
+    case = case_layer.open_case(root, name, cases)
+    if not case.exists():
+        return Result(ok=False, lines=[f"没有这件事：{case.path}"])
+    state = case.stages()
+    result = Result(columns=STEP_COLUMNS)
+    result.rows = [(stage, "✓" if state[stage] else "—") for stage in case_layer.STAGES]
+    result.lines = [f"一件事：{case.name}（{case.path}）"]
+    result.lines += [f"  {'✓' if state[s] else '—'} {s}" for s in case_layer.STAGES]
+    result.lines.append(case_layer.state_line(case))
+    events = case.events()[-5:]
+    if events:
+        result.lines.append("流水（最近五条）：")
+        result.lines += [f"  {e['at']}　{e['kind']}　{e['detail']}" for e in events]
     return result
 
 
-def next_step(sections: dict[str, list[str]], broken: list[str]) -> str:
-    """一件事走到哪，就报下一步该敲什么。"""
-    if broken:
-        return "先补上断掉的引用，再往下走。"
-    if not sections.get("材料"):
-        return "先记材料：kg material <路径>"
-    if not sections.get("契约"):
-        first = LINK.search(sections["材料"][0])
-        return f"立契约：kg new-contract <契约.md> --about {first.group(1) if first else '<材料>'}"
-    if not sections.get("产出"):
-        return "按契约做出来，落到产出那一节。"
-    if not sections.get("案卷"):
-        return f"把核对结果写进案卷：kg audit-contract {link_of(sections['契约'][0])} --into <案卷.md>"
-    return "四段齐了：核对案卷 kg audit-dossier <案卷.md>，再把成果登记回工作区。"
+def case_list(root: Path, cases: str | None = None) -> Result:
+    found = case_layer.listing(root, cases)
+    result = Result(columns=("一件事", "下一步", "位置"))
+    for case in found:
+        action, _ = case.next_action()
+        result.rows.append((case.name, action, short(root, case.path)))
+        result.lines.append(f"{case.name:24} 下一步：{action}")
+    if not found:
+        result.lines = ["还没有一件事：kg case --new <名字>"]
+    return result
 
 
-def link_of(item: str) -> str:
-    found = LINK.search(item)
-    return found.group(1) if found else item.strip("- ")
+def case_step(root: Path, name: str, action: str, value: str = "", cases: str | None = None) -> Result:
+    """在一件事上走一步；事实自动记进它的流水。"""
+    case = case_layer.open_case(root, name, cases)
+    if not case.exists():
+        return Result(ok=False, lines=[f"没有这件事：{case.path}"])
+
+    if action == "material":
+        if not value.strip():
+            return Result(ok=False, lines=["请给材料一个路径"])
+        path = here(root, value.strip())
+        if not path.is_file():
+            return Result(ok=False, lines=[f"没有这个文件：{value}"])
+        mat = material_layer.as_material(root, path)
+        rel = short(root, path)
+        fields = f"{mat.type} / {mat.stage} / {mat.created_at or '（缺时间）'} / {mat.source}"
+        case_layer.add_material(case, root, rel, fields)
+        message = f"记下材料：{rel}"
+    elif action == "contract":
+        about = value.strip() or (case.items(case_layer.MATERIALS)[0].split("　")[0].strip("`") if case.items(case_layer.MATERIALS) else "")
+        case_layer.write_contract(case, about)
+        message = f"写好契约：{short(root, case.file(case_layer.CONTRACT))}" + (f"（以 {about} 为题）" if about else "")
+    elif action == "review":
+        ok, lines = case_layer.review(case, root)
+        message = "核对完了，审查者报告已写进案卷" if ok else "核对没过：" + "；".join(lines[:2])
+        case_after = case_status(root, name, cases)
+        case_after.lines.insert(0, message)
+        return case_after
+    elif action == "output":
+        if not value.strip():
+            return Result(ok=False, lines=["请给产出一个路径"])
+        path = here(root, value.strip())
+        case_layer.add_output(case, short(root, path))
+        message = f"记下产出：{short(root, path)}"
+    elif action == "decision":
+        if not value.strip():
+            return Result(ok=False, lines=["裁决得写句话：谁拍的板、决定是什么"])
+        case_layer.decide(case, value.strip())
+        message = "裁决已记入案卷"
+    elif action == "finish":
+        items = case_layer.finish(case, root)
+        message = f"成果已写进案卷：{len(items)} 项"
+    else:
+        return Result(ok=False, lines=[f"不认得这一步：{action}"])
+
+    state = case_status(root, name, cases)
+    state.lines.insert(0, message)
+    return state

@@ -1,8 +1,10 @@
-"""图形入口：同一个程序开个窗，动作与命令行一模一样。
+"""图形入口：主界面是「当前这一件事」，动作只是它的下一步。
 
   kg gui        或   ./kg-gui
 
-左栏选动作，右栏填参数，点「执行」，下边出结果；结果里的文件路径双击就用系统默认程序打开。
+两页：
+  台面——选一件事，看它六格状态与流水，点「下一步」往前走，事实自动记进这件事；
+  浏览——工作区层面的动作（目录、审计、找文档、看材料）与不挂在案子上的一件件记录。
 """
 
 import argparse
@@ -15,10 +17,12 @@ from PySide6.QtGui import QColor, QDesktopServices, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -29,18 +33,41 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from . import assets as assets_layer
+from . import case as case_layer
 from . import catalog as catalog_layer
 from . import records
 from . import report
 
+STEPS = (
+    ("材料", "material", "记一条材料"),
+    ("契约", "contract", "以记下的材料立契约"),
+    ("核对", "review", "跑机械核对，结果写进案卷"),
+    ("产出", "output", "记一笔产出"),
+    ("裁决", "decision", "写下裁决"),
+    ("成果", "finish", "收尾：成果写进案卷"),
+)
+
+
+# ---- 浏览页：工作区层面的动作 ----
+
 
 def material_paths(values: dict) -> list[str] | None:
     return values.get("材料路径", "").split() or None
+
+
+def optional(field: str) -> str:
+    """可选字段的名字：去掉「（可留空）」就是它的本来面目。"""
+    return field.replace("（可留空）", "")
+
+
+def value(values: dict, field: str) -> str:
+    return values.get(field, "").strip()
 
 
 @dataclass(frozen=True)
@@ -56,22 +83,8 @@ class Spec:
     payload: object = None
 
 
-OPTIONAL = ()
-
-
-def optional(field: str) -> str:
-    """可选字段的名字：去掉「（可留空）」就是它的本来面目。"""
-    return field.replace("（可留空）", "")
-
-
-def value(values: dict, field: str) -> str:
-    return values.get(field, "").strip()
-
-
-# 分五组：一件事是主轴，工作区看整体，查看看一件，契约与案卷各管一种记录
+# 分四组：工作区看整体，查看看一件，契约与案卷各管一种记录
 SPECS = (
-    Spec("一件事", "起一件事", "写出材料 / 契约 / 产出 / 案卷四段骨架", ("目标文件",), lambda root, v: report.case_new(Path(value(v, "目标文件")))),
-    Spec("一件事", "看一件事", "走到哪一步、有没有断链、下一步做什么", ("一件事文件",), lambda root, v: report.case(root, Path(value(v, "一件事文件")))),
     Spec("工作区", "目录", "列全部条目——契约 × 目录", (), lambda root, v: report.catalog(root), "目录.json", lambda root, v: report.catalog_payload(root)),
     Spec("工作区", "审计", "契约有而工作区无、工作区有而契约无", ("补建缺的资产",), lambda root, v: report.audit(root, make=bool(v.get("补建缺的资产"))), "审计.json", lambda root, v: report.audit_payload(root)),
     Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, value(v, "名字"), bool(v.get("看正文")))),
@@ -82,40 +95,24 @@ SPECS = (
     Spec("案卷", "核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(value(v, "案卷文件")))),
 )
 
-# 这些动作的结果是一张带路径的表，可以拿选中那行去立契约
 CAN_ABOUT = ("目录", "找文档", "看材料")
 
 
-class Window(QMainWindow):
-    def __init__(self, root: Path | None = None):
+class Browser(QWidget):
+    """浏览页：左栏选动作，右栏填参数，下边出结果。"""
+
+    def __init__(self, root: Path):
         super().__init__()
-        self.setWindowTitle("kg —— 量潮知识工作工具箱")
-        self.resize(1000, 640)
-        self.root = root or assets_layer.repo_root()
+        self.root = root
         self.spec = SPECS[0]
         self.widgets: dict[str, QWidget] = {}
+        self.rows: dict[int, Spec | None] = {}
         self.last_result: report.Result | None = None
-        self.rows: dict[int, Spec | None] = {}  # 列表行号 → 动作（分组的表头为 None）
         self._build()
-        self.select_action(SPECS[0].name)
+        self.select_action("目录")
 
-    # ---- 界面 ----
     def _build(self) -> None:
-        body = QWidget()
-        self.setCentralWidget(body)
-        outer = QVBoxLayout(body)
-
-        top = QHBoxLayout()
-        top.addWidget(QLabel("工作区"))
-        self.root_edit = QLineEdit(str(self.root))
-        self.root_edit.editingFinished.connect(self._change_root)
-        top.addWidget(self.root_edit, 1)
-        pick = QPushButton("选择…")
-        pick.clicked.connect(self._pick_root)
-        top.addWidget(pick)
-        outer.addLayout(top)
-
-        columns = QHBoxLayout()
+        columns = QHBoxLayout(self)
         self.list = QListWidget()
         self.fill_actions()
         self.list.setFixedWidth(150)
@@ -138,7 +135,6 @@ class Window(QMainWindow):
 
         buttons = QHBoxLayout()
         self.run_button = QPushButton("执行")
-        self.run_button.setDefault(True)
         self.run_button.clicked.connect(self.run_current)
         buttons.addWidget(self.run_button)
         self.export_button = QPushButton("导出…")
@@ -164,18 +160,14 @@ class Window(QMainWindow):
         self.stack.addWidget(self.text)
         right.addWidget(self.stack, 1)
         columns.addLayout(right, 1)
-        outer.addLayout(columns, 1)
-
-        self.statusBar().showMessage("选好动作，点执行。表里带路径的行，双击就用系统默认程序打开。")
 
     def fill_actions(self) -> None:
-        """填空动作列表：分组表头不可选，其余一行一个动作。"""
         group = None
         for spec in SPECS:
             if spec.group != group:
                 group = spec.group
                 header = QListWidgetItem(group)
-                header.setFlags(Qt.ItemFlag.ItemIsEnabled)  # 能看不能选
+                header.setFlags(Qt.ItemFlag.ItemIsEnabled)
                 font = header.font()
                 font.setBold(True)
                 header.setFont(font)
@@ -186,7 +178,6 @@ class Window(QMainWindow):
             self.rows[self.list.count() - 1] = spec
 
     def select_action(self, name: str) -> None:
-        """按名字选中动作——表头占了行号，别按序号选。"""
         for row, spec in self.rows.items():
             if spec and spec.name == name:
                 self.list.setCurrentRow(row)
@@ -195,7 +186,7 @@ class Window(QMainWindow):
 
     def _select(self, row: int) -> None:
         spec = self.rows.get(row)
-        if spec is None:  # 点到分组表头，什么也不做
+        if spec is None:
             return
         self.spec = spec
         while self.form.count():
@@ -204,9 +195,8 @@ class Window(QMainWindow):
                 widget.deleteLater()
         self.widgets = {}
         for field in self.spec.fields:
-            if field == "看正文" or field == "补建缺的资产":
+            if field in ("看正文", "补建缺的资产"):
                 widget = QCheckBox()
-                widget.setChecked(False)
                 self.widgets[field] = widget
             elif optional(field).endswith("文件") or optional(field) in ("以它为题", "写入案卷"):
                 widget = self._with_browse(field)
@@ -219,7 +209,6 @@ class Window(QMainWindow):
         self.about_button.setVisible(self.spec.name in CAN_ABOUT)
         self.hint_label.setText(self.spec.hint)
         self.show_result(report.Result(lines=[f"{self.spec.name}：{self.spec.hint}"]))
-        self.statusBar().showMessage(self.spec.hint)
         if not self.spec.fields:  # 没有参数的动作（目录、审计）选中就直接出结果
             self.run_current()
 
@@ -245,7 +234,6 @@ class Window(QMainWindow):
         self.widgets[field] = edit
         return box
 
-    # ---- 动作 ----
     def values(self) -> dict:
         gathered = {}
         for field, widget in self.widgets.items():
@@ -277,9 +265,8 @@ class Window(QMainWindow):
             self.table.setHorizontalHeaderLabels(list(result.columns))
             self.table.setRowCount(len(result.rows))
             for row, values in enumerate(result.rows):
-                for col, value in enumerate(values):
-                    self.table.setItem(row, col, QTableWidgetItem(str(value)))
-            self.table.resizeColumnsToContents()
+                for col, cell in enumerate(values):
+                    self.table.setItem(row, col, QTableWidgetItem(str(cell)))
             header = self.table.horizontalHeader()
             for col in range(self.table.columnCount()):
                 header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
@@ -287,8 +274,6 @@ class Window(QMainWindow):
             self.stack.setCurrentWidget(self.table)
         else:
             self.stack.setCurrentWidget(self.text)
-        count = f"　{len(result.rows)} 行" if result.columns else ""
-        self.statusBar().showMessage(f"{'通过' if result.ok else '有问题'}{count}")
 
     def _export(self) -> None:
         if not self.spec.payload:
@@ -296,12 +281,10 @@ class Window(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "导出到哪", str(self.root / self.spec.export), "JSON (*.json)")
         if not path:
             return
-        payload = self.spec.payload(self.root, self.values())
-        catalog_layer.write_json(Path(path), payload)
-        self.statusBar().showMessage(f"已导出：{path}")
+        catalog_layer.write_json(Path(path), self.spec.payload(self.root, self.values()))
+        self.window().statusBar().showMessage(f"已导出：{path}")
 
     def _selected_path(self) -> str:
-        """选中那一行里像路径的格子。"""
         row = self.table.currentRow()
         if row < 0:
             return ""
@@ -314,30 +297,221 @@ class Window(QMainWindow):
     def _contract_about(self) -> None:
         about = self._selected_path()
         if not about:
-            self.statusBar().showMessage("先在表里选一行")
+            self.window().statusBar().showMessage("先在表里选一行")
             return
         path, _ = QFileDialog.getSaveFileName(self, f"以「{about}」为题立契约", str(self.root), "Markdown (*.md)")
-        if not path:
-            return
-        result = report.new_contract(Path(path), about)
-        self.show_result(result)
-        self.statusBar().showMessage("；".join(result.lines))
+        if path:
+            self.show_result(report.new_contract(Path(path), about))
 
     def _open_row(self, row: int) -> None:
         for col in range(self.table.columnCount()):
             item = self.table.item(row, col)
             if not item:
                 continue
-            text = item.text()
-            candidate = Path(text)
-            path = candidate if candidate.is_absolute() else self.root / text
+            candidate = Path(item.text())
+            path = candidate if candidate.is_absolute() else self.root / item.text()
             if path.is_file():
                 QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
                 return
-        self.statusBar().showMessage("这一行没有可打开的文件")
+        self.window().statusBar().showMessage("这一行没有可打开的文件")
+
+
+# ---- 台面页：一件事 ----
+
+
+class Desk(QWidget):
+    """台面：选一件事，看状态，点下一步往前走。"""
+
+    def __init__(self, root: Path, cases: Path | None = None):
+        super().__init__()
+        self.root = root
+        self.cases = cases
+        self.case: case_layer.Case | None = None
+        self.step_buttons: dict[str, QPushButton] = {}
+        self._build()
+        self.reload()
+
+    def _build(self) -> None:
+        outer = QVBoxLayout(self)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("一件事"))
+        self.picker = QComboBox()
+        self.picker.setMinimumWidth(260)
+        self.picker.currentIndexChanged.connect(self._picked)
+        top.addWidget(self.picker)
+        fresh = QPushButton("新建…")
+        fresh.clicked.connect(self._new_case)
+        top.addWidget(fresh)
+        top.addStretch(1)
+        outer.addLayout(top)
+
+        self.next_label = QLabel()
+        self.next_label.setWordWrap(True)
+        font = self.next_label.font()
+        font.setBold(True)
+        self.next_label.setFont(font)
+        outer.addWidget(self.next_label)
+
+        middle = QHBoxLayout()
+        self.state_table = QTableWidget(0, 2)
+        self.state_table.setHorizontalHeaderLabels(["段", "状态"])
+        self.state_table.verticalHeader().setVisible(False)
+        self.state_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.state_table.setMaximumWidth(260)
+        self.state_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.state_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        middle.addWidget(self.state_table)
+
+        steps = QVBoxLayout()
+        row = QHBoxLayout()
+        for label, action, hint in STEPS:
+            button = QPushButton(label)
+            button.setToolTip(hint)
+            button.clicked.connect(lambda _=False, a=action: self.step(a))
+            self.step_buttons[action] = button
+            row.addWidget(button)
+        row.addStretch(1)
+        steps.addLayout(row)
+        self.log_table = QTableWidget(0, 3)
+        self.log_table.setHorizontalHeaderLabels(["时间", "动作", "说明"])
+        self.log_table.verticalHeader().setVisible(False)
+        self.log_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.log_table.setAlternatingRowColors(True)
+        header = self.log_table.horizontalHeader()
+        for col in (0, 1):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        steps.addWidget(self.log_table, 1)
+        middle.addLayout(steps, 1)
+        outer.addLayout(middle, 1)
+
+    # ---- 读 ----
+
+    def reload(self) -> None:
+        """重扫案子目录，尽量把选中的那件事留着。"""
+        keep = self.case.name if self.case else ""
+        found = case_layer.listing(self.root, self.cases)
+        self.picker.blockSignals(True)
+        self.picker.clear()
+        self.picker.addItems([case.name for case in found])
+        if keep:
+            index = self.picker.findText(keep)
+            if index >= 0:
+                self.picker.setCurrentIndex(index)
+        self.picker.blockSignals(False)
+        self.case = found[self.picker.currentIndex()] if found else None
+        self.refresh()
+
+    def _picked(self, index: int) -> None:
+        found = case_layer.listing(self.root, self.cases)
+        self.case = found[index] if 0 <= index < len(found) else None
+        self.refresh()
+
+    # ---- 画 ----
+
+    def refresh(self) -> None:
+        if self.case is None:
+            self.next_label.setText("还没有一件事——点「新建…」起一件")
+            self.state_table.setRowCount(0)
+            self.log_table.setRowCount(0)
+            for button in self.step_buttons.values():
+                button.setEnabled(False)
+            return
+        state = self.case.stages()
+        self.state_table.setRowCount(len(case_layer.STAGES))
+        for row, stage in enumerate(case_layer.STAGES):
+            self.state_table.setItem(row, 0, QTableWidgetItem(stage))
+            self.state_table.setItem(row, 1, QTableWidgetItem("✓" if state[stage] else "—"))
+        action, hint = self.case.next_action()
+        self.next_label.setText(case_layer.state_line(self.case))
+        for key, button in self.step_buttons.items():
+            button.setEnabled(True)
+            button.setDefault(key == action)
+            button.setStyleSheet("font-weight: bold;" if key == action else "")
+        events = self.case.events()
+        self.log_table.setRowCount(len(events))
+        for row, event in enumerate(reversed(events)):
+            self.log_table.setItem(row, 0, QTableWidgetItem(event["at"]))
+            self.log_table.setItem(row, 1, QTableWidgetItem(event["kind"]))
+            self.log_table.setItem(row, 2, QTableWidgetItem(event["detail"]))
+
+    # ---- 走一步 ----
+
+    def step(self, action: str) -> report.Result:
+        bar = self.window().statusBar()
+        if self.case is None:
+            bar.showMessage("先起一件事")
+            return report.Result(ok=False, lines=["先起一件事"])
+        value = self._ask(action)
+        if value is None:  # 用户取消
+            return report.Result(ok=False, lines=["取消了"])
+        result = report.case_step(self.root, self.case.name, action, value, str(self.cases) if self.cases else None)
+        self.reload()
+        bar.showMessage(result.lines[0] if result.lines else "")
+        return result
+
+    def _ask(self, action: str) -> str | None:
+        """要填的几步先问一下；其余直接走。"""
+        if action in ("material", "output"):
+            what = "材料" if action == "material" else "产出"
+            path, _ = QFileDialog.getOpenFileName(self, f"选一份{what}", str(self.root))
+            if not path:
+                return None
+            candidate = Path(path)
+            return report.short(self.root, candidate) if candidate.is_relative_to(self.root) else path
+        if action == "decision":
+            words, ok = QInputDialog.getMultiLineText(self, "裁决", "谁拍的板、决定是什么")
+            return words.strip() if ok else None
+        return ""
+
+    def _new_case(self) -> None:
+        name, ok = QInputDialog.getText(self, "起一件事", "这件事叫什么")
+        if not ok or not name.strip():
+            return
+        about, ok = QInputDialog.getText(self, "起一件事", "一句话说清要什么（可留空）")
+        case = case_layer.create(self.root, name.strip(), self.cases, about.strip() if ok else "")
+        self.case = case
+        self.reload()
+        self.window().statusBar().showMessage(f"起了：{case.path}")
+
+
+class Window(QMainWindow):
+    def __init__(self, root: Path | None = None, cases: Path | None = None):
+        super().__init__()
+        self.setWindowTitle("kg —— 量潮知识工作工具箱")
+        self.resize(1040, 660)
+        self.root = root or assets_layer.repo_root()
+        self.cases = cases
+
+        body = QWidget()
+        self.setCentralWidget(body)
+        outer = QVBoxLayout(body)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("工作区"))
+        self.root_edit = QLineEdit(str(self.root))
+        self.root_edit.editingFinished.connect(self._change_root)
+        top.addWidget(self.root_edit, 1)
+        pick = QPushButton("选择…")
+        pick.clicked.connect(self._pick_root)
+        top.addWidget(pick)
+        outer.addLayout(top)
+
+        self.desk = Desk(self.root, cases)
+        self.browser = Browser(self.root)
+        tabs = QTabWidget()
+        tabs.addTab(self.desk, "台面")
+        tabs.addTab(self.browser, "浏览")
+        outer.addWidget(tabs, 1)
+
+        self.statusBar().showMessage("台面：选一件事，点下一步；浏览：工作区层面的动作。")
 
     def _change_root(self) -> None:
         self.root = Path(self.root_edit.text()).expanduser()
+        self.desk.root = self.root
+        self.browser.root = self.root
+        self.desk.reload()
         self.statusBar().showMessage(f"工作区：{self.root}")
 
     def _pick_root(self) -> None:
@@ -350,10 +524,14 @@ class Window(QMainWindow):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kg-gui", description="量潮知识工作工具箱的窗口版")
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
+    parser.add_argument("--cases", help="案子放哪（默认 工作区/cases）")
     args = parser.parse_args(argv)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("kg")
-    window = Window(Path(args.root).resolve() if args.root else None)
+    window = Window(
+        Path(args.root).resolve() if args.root else None,
+        Path(args.cases).resolve() if args.cases else None,
+    )
     window.show()
     return app.exec()
 

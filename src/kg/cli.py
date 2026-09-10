@@ -16,9 +16,17 @@
   kg new-dossier <文件> [--about 标题]    写案卷骨架
   kg audit-dossier <文件>        核对案卷——段位齐全
 
-一件事
-  kg case <文件>                 看这件事走到哪一步、下一步做什么
-  kg case --new <文件>           起一件事（材料 / 契约 / 产出 / 案卷）
+一件事（对象在盘上，动作作用在它身上，事实自动记进流水）
+  kg case --list                 有哪些事、各自下一步
+  kg case --new <名字>           起一件事
+  kg case <名字>                 看这件事的六格状态与流水
+  kg case <名字> --material <路径>   记一条材料（类型 / 阶段 / 时间 / 来源现填）
+  kg case <名字> --contract       以记下的材料立契约
+  kg case <名字> --review         跑机械核对，审查者报告写进案卷
+  kg case <名字> --output <路径>     记一笔产出
+  kg case <名字> --decision <话>     写下裁决
+  kg case <名字> --finish         收尾：成果写进案卷
+  （案子默认落在 <工作区>/cases/，用 --cases 换地方）
 
   kg gui                         开图形界面（同一个程序的窗口版）
 
@@ -81,9 +89,27 @@ def cmd_audit_contract(root: Path, args) -> int:
 
 
 def cmd_case(root: Path, args) -> int:
+    if args.list:
+        return emit(report.case_list(root, args.cases))
     if args.new:
-        return emit(report.case_new(Path(args.target or ""), args.about))
-    return emit(report.case(root, Path(args.target or "")))
+        return emit(report.case_new(root, args.name or "", args.cases, args.about))
+    if not args.name:
+        return emit(report.Result(ok=False, lines=["用法：kg case <名字>，或 kg case --list / --new <名字>"]))
+    for action in ("material", "contract", "review", "output", "decision", "finish"):
+        if getattr(args, action):
+            value = value_of(args, action)
+            return emit(report.case_step(root, args.name, action, value, args.cases))
+    return emit(report.case_status(root, args.name, args.cases))
+
+
+def value_of(args, action: str) -> str:
+    """能带值的几步：材料与产出给路径，裁决给一句话；契约与核对不带值也能走。"""
+    given = getattr(args, action)
+    if action in ("material", "output"):
+        return given if isinstance(given, str) else ""
+    if action == "decision":
+        return given if isinstance(given, str) else ""
+    return ""
 
 
 def cmd_audit_dossier(root: Path, args) -> int:
@@ -133,10 +159,18 @@ def build_parser() -> argparse.ArgumentParser:
     checking.add_argument("target", metavar="文件")
     checking.add_argument("--into", metavar="案卷", help="把审查者报告写进这份案卷")
     sub.add_parser("audit-dossier", help="核对案卷").add_argument("target", metavar="文件")
-    case = sub.add_parser("case", help="看一件事 / 起一件事")
-    case.add_argument("target", nargs="?", metavar="文件")
-    case.add_argument("--new", action="store_true", help="起一件事（写出四段骨架）")
-    case.add_argument("--about", default="", metavar="标题")
+    case = sub.add_parser("case", help="一件事：起、看、走一步")
+    case.add_argument("name", nargs="?", metavar="名字")
+    case.add_argument("--list", action="store_true", help="有哪些事、各自下一步")
+    case.add_argument("--new", action="store_true", help="起一件事")
+    case.add_argument("--about", default="", metavar="一句话", help="起案时的一句话，或立契约时以哪件东西为题")
+    case.add_argument("--cases", metavar="目录", help="案子放哪（默认 工作区/cases）")
+    case.add_argument("--material", nargs="?", const=True, metavar="路径")
+    case.add_argument("--contract", nargs="?", const=True, metavar="以它为题的路径")
+    case.add_argument("--review", action="store_true")
+    case.add_argument("--output", nargs="?", const=True, metavar="路径")
+    case.add_argument("--decision", nargs="?", const=True, metavar="一句话")
+    case.add_argument("--finish", action="store_true")
     sub.add_parser("gui", help="开图形界面")
     return parser
 

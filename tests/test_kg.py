@@ -19,6 +19,7 @@ from kg import assets as assets_layer  # noqa: E402
 from kg import catalog as catalog_layer  # noqa: E402
 from kg import checks as checks_layer  # noqa: E402
 from kg import cli, material as material_layer  # noqa: E402
+from kg import case as case_layer  # noqa: E402
 from kg import records  # noqa: E402
 from kg import report  # noqa: E402
 
@@ -90,19 +91,25 @@ def links(real: Path) -> None:
         test("链接②：独立仓库那三格不凭空建", left == set(assets_layer.LOCATION), f"剩 {sorted(left)}")
 
     with tempfile.TemporaryDirectory() as tmp:
-        root = fake_repo(Path(tmp) / "case")  # 用假仓库当工作区，引用都相对它
+        root = fake_repo(Path(tmp) / "case")
         (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
-        (root / "契约.md").write_text("# 契约\n", encoding="utf-8")
         (root / "产出.md").write_text("# 产出\n", encoding="utf-8")
-        one = case_file(Path(tmp) / "一件事.md")
-        test("主轴：空的一件事指向第一步", "先记材料" in report.case(root, one).lines[-1])
-        case_file(one, material="data/journal/2026-09-10.md")
-        test("主轴：有材料就指向立契约", "new-contract" in report.case(root, one).lines[-1])
-        case_file(one, material="data/journal/2026-09-10.md", contract="契约.md", output="产出.md")
-        test("主轴：有契约有产出就指向写案卷", "--into" in report.case(root, one).lines[-1])
-        case_file(one, material="data/不存在.md")
-        broken = report.case(root, one)
-        test("主轴：断链点得出来", not broken.ok and "断链" in "".join(broken.lines))
+        cases = str(Path(tmp) / "cases")
+        report.case_new(root, "试一条路", cases, "把动作串起来")
+        start_state = report.case_status(root, "试一条路", cases)
+        test("主轴：起案时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
+        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""))
+        marks = []
+        for action, given in walk:
+            step = report.case_step(root, "试一条路", action, given, cases)
+            marks.append([row[1] for row in step.rows].count("✓"))
+        test("主轴：六步顺次点亮", marks == [1, 2, 3, 4, 5, 6], f"实得 {marks}")
+        case = case_layer.open_case(root, "试一条路", cases)
+        test("主轴：流水记满七条", len(case.events()) == 7, f"实得 {len(case.events())}")
+        test("主轴：案卷四段都是真的", all(case.dossier().get(name) for name in records.DOSSIER_SECTIONS), str(case.dossier().keys()))
+        test("主轴：认不得的步骤挡住", not report.case_step(root, "试一条路", "乱来", "", cases).ok)
+        test("主轴：列案子报下一步", report.case_list(root, cases).rows[0][1] == "完成")
+        test("主轴：案子进得了目录", "试一条路" in "".join(row[0] for row in report.case_list(root, cases).rows))
 
 
 def gui_smoke(real: Path) -> None:
@@ -117,22 +124,37 @@ def gui_smoke(real: Path) -> None:
         return
     app = QApplication.instance() or QApplication([])
     window = gui.Window(real)
-    window.select_action("目录")
-    test("界面：目录出得了表", bool(window.run_current().rows))
-    window.select_action("审计")
-    test("界面：审计通过", window.run_current().ok)
-    window.select_action("核对契约")
-    window.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
-    audit = window.run_current()
+    browser = window.browser
+    browser.select_action("目录")
+    test("界面：目录出得了表", bool(browser.run_current().rows))
+    browser.select_action("审计")
+    test("界面：审计通过", browser.run_current().ok)
+    browser.select_action("核对契约")
+    browser.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
+    audit = browser.run_current()
     test("界面：核对真实契约", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
-    window.select_action("目录")
-    window.run_current()
-    window.table.setCurrentCell(0, 1)
-    test("界面：选中一行能取到路径", bool(window._selected_path()), window._selected_path())
-    window.select_action("找文档")
-    test("界面：空输入先拦住", not window.run_current().ok)
+    browser.select_action("目录")
+    browser.run_current()
+    browser.table.setCurrentCell(0, 1)
+    test("界面：选中一行能取到路径", bool(browser._selected_path()), browser._selected_path())
+    browser.select_action("找文档")
+    test("界面：空输入先拦住", not browser.run_current().ok)
     groups = [spec.group for spec in gui.SPECS]
-    test("界面：动作分五组", groups == ["一件事", "一件事", "工作区", "工作区", "查看", "查看", "契约", "契约", "案卷", "案卷"], str(groups))
+    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "契约", "契约", "案卷", "案卷"], str(groups))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fake = fake_repo(Path(tmp) / "desk")
+        (fake / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
+        cases = str(Path(tmp) / "cases")
+        desk = gui.Desk(fake, Path(cases))
+        test("台面：没有案子时提示起一件", "新建" in desk.next_label.text())
+        case_layer.create(fake, "试一条路", cases, "把动作串起来")
+        desk.reload()
+        report.case_step(fake, "试一条路", "material", "data/journal/2026-09-10.md", cases)
+        desk.reload()
+        test("台面：状态表跟着走", desk.state_table.item(0, 1).text() == "✓" and desk.state_table.item(1, 1).text() == "—")
+        test("台面：流水表有记录", desk.log_table.rowCount() >= 2, f"{desk.log_table.rowCount()} 行")
+        test("台面：下一步指向契约", "契约" in desk.next_label.text(), desk.next_label.text())
     window.close()
     del app
 
