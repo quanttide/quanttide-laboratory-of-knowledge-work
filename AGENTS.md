@@ -8,7 +8,7 @@
 
 ```text
 data/
-├── tasks/      任务在飞的：task.md（指令：目标 / 步骤 / 验收）、materials.md、log.jsonl
+├── runs/       一次运行的现场：task.md（指令：目标 / 步骤 / 验收）、materials.md、log.jsonl
 ├── report/     报告（侧重事件）：生成者产出 / 审查者报告 / 人类裁决 / 最终成果
 ├── history/    历史（侧重叙事）：这个任务的来龙去脉，人写
 └── samples/    判例：真实指令与真实报告

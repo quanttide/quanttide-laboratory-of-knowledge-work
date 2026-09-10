@@ -3,7 +3,7 @@
   kg gui        或   ./kg-gui
 
 两页：
-  台面——选任务，看它六格状态与流水，点「下一步」往前走，事实自动记进这个任务；
+  台面——选任务，看它七格状态与流水，点「下一步」往前走，事实自动记进这个任务；
   浏览——工作区层面的动作（目录、审计、找文档、看材料）与不挂在任务上的一件件记录。
 """
 
@@ -39,7 +39,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import assets as assets_layer
-from . import task as task_layer
+from . import workflow as flow_layer
 from . import catalog as catalog_layer
 from . import records
 from . import report
@@ -321,14 +321,14 @@ class Browser(QWidget):
 
 
 class Desk(QWidget):
-    """台面：选任务，看状态，点下一步往前走。"""
+    """台面：选一次运行，看七个标准任务的状态，点下一步往前走。"""
 
-    def __init__(self, root: Path, data: Path, tasks: Path | None = None):
+    def __init__(self, root: Path, data: Path, runs: Path | None = None):
         super().__init__()
         self.root = root
         self.data = data
-        self.tasks = tasks
-        self.task: task_layer.Case | None = None
+        self.runs = runs
+        self.run: flow_layer.Run | None = None
         self.step_buttons: dict[str, QPushButton] = {}
         self._build()
         self.reload()
@@ -337,13 +337,13 @@ class Desk(QWidget):
         outer = QVBoxLayout(self)
 
         top = QHBoxLayout()
-        top.addWidget(QLabel("任务"))
+        top.addWidget(QLabel("运行"))
         self.picker = QComboBox()
         self.picker.setMinimumWidth(260)
         self.picker.currentIndexChanged.connect(self._picked)
         top.addWidget(self.picker)
         fresh = QPushButton("新建…")
-        fresh.clicked.connect(self._new_task)
+        fresh.clicked.connect(self._new_run)
         top.addWidget(fresh)
         top.addStretch(1)
         outer.addLayout(top)
@@ -392,8 +392,8 @@ class Desk(QWidget):
 
     def reload(self) -> None:
         """重扫任务目录，尽量把选中的那件事留着。"""
-        keep = self.task.name if self.task else ""
-        found = task_layer.listing(self.root, self.data, self.tasks)
+        keep = self.run.name if self.run else ""
+        found = flow_layer.listing(self.root, self.data, self.runs)
         self.picker.blockSignals(True)
         self.picker.clear()
         self.picker.addItems([task.name for task in found])
@@ -402,36 +402,36 @@ class Desk(QWidget):
             if index >= 0:
                 self.picker.setCurrentIndex(index)
         self.picker.blockSignals(False)
-        self.task = found[self.picker.currentIndex()] if found else None
+        self.run = found[self.picker.currentIndex()] if found else None
         self.refresh()
 
     def _picked(self, index: int) -> None:
-        found = task_layer.listing(self.root, self.data, self.tasks)
-        self.task = found[index] if 0 <= index < len(found) else None
+        found = flow_layer.listing(self.root, self.data, self.runs)
+        self.run = found[index] if 0 <= index < len(found) else None
         self.refresh()
 
     # ---- 画 ----
 
     def refresh(self) -> None:
-        if self.task is None:
-            self.next_label.setText("还没有任务——点「新建…」起一件")
+        if self.run is None:
+            self.next_label.setText("还没有运行——点「新建…」起一件")
             self.state_table.setRowCount(0)
             self.log_table.setRowCount(0)
             for button in self.step_buttons.values():
                 button.setEnabled(False)
             return
-        state = self.task.stages()
-        self.state_table.setRowCount(len(task_layer.STAGES))
-        for row, stage in enumerate(task_layer.STAGES):
+        state = self.run.stages()
+        self.state_table.setRowCount(len(flow_layer.STAGES))
+        for row, stage in enumerate(flow_layer.STAGES):
             self.state_table.setItem(row, 0, QTableWidgetItem(stage))
             self.state_table.setItem(row, 1, QTableWidgetItem("✓" if state[stage] else "—"))
-        action, hint = self.task.next_action()
-        self.next_label.setText(task_layer.state_line(self.task))
+        action, hint = self.run.next_action()
+        self.next_label.setText(flow_layer.state_line(self.run))
         for key, button in self.step_buttons.items():
             button.setEnabled(True)
             button.setDefault(key == action)
             button.setStyleSheet("font-weight: bold;" if key == action else "")
-        events = self.task.events()
+        events = self.run.events()
         self.log_table.setRowCount(len(events))
         for row, event in enumerate(reversed(events)):
             self.log_table.setItem(row, 0, QTableWidgetItem(event["at"]))
@@ -442,17 +442,17 @@ class Desk(QWidget):
 
     def step(self, action: str) -> report.Result:
         bar = self.window().statusBar()
-        if self.task is None:
-            bar.showMessage("先起任务")
-            return report.Result(ok=False, lines=["先起任务"])
+        if self.run is None:
+            bar.showMessage("先起一次运行")
+            return report.Result(ok=False, lines=["先起一次运行"])
         value = self._ask(action)
         if value is None:  # 用户取消
             return report.Result(ok=False, lines=["取消了"])
-        result = report.task_step(self.root, self.task.name, action, value, self.data, str(self.tasks) if self.tasks else None)
+        result = report.run_step(self.root, self.run.name, action, value, self.data, str(self.runs) if self.runs else None)
         self.reload()
-        if action == "instruction" and not self.task.stages()["指令"]:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.task.file(task_layer.TASK_FILE))))
-            result.lines.append(f"已打开 {self.task.file(task_layer.TASK_FILE)}——把步骤与验收填上")
+        if action == "instruction" and not self.run.stages()["指令"]:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.run.file(flow_layer.TASK_FILE))))
+            result.lines.append(f"已打开 {self.run.file(flow_layer.TASK_FILE)}——把步骤与验收填上")
         bar.showMessage(result.lines[0] if result.lines else "")
         return result
 
@@ -472,24 +472,24 @@ class Desk(QWidget):
             return words.strip() if ok else None
         return ""
 
-    def _new_task(self) -> None:
-        name, ok = QInputDialog.getText(self, "起任务", "这个任务叫什么")
+    def _new_run(self) -> None:
+        name, ok = QInputDialog.getText(self, "起一次运行", "这次运行叫什么")
         if not ok or not name.strip():
             return
-        about, ok = QInputDialog.getText(self, "起任务", "一句话说清要什么（可留空）")
-        self.task = task_layer.create(self.root, name.strip(), self.data, self.tasks, about.strip() if ok else "")
+        about, ok = QInputDialog.getText(self, "起一次运行", "一句话说清要什么（可留空）")
+        self.run = flow_layer.create(self.root, name.strip(), self.data, self.runs, about.strip() if ok else "")
         self.reload()
         self.window().statusBar().showMessage(f"起了：{task.dir}")
 
 
 class Window(QMainWindow):
-    def __init__(self, root: Path | None = None, data: Path | None = None, tasks: Path | None = None):
+    def __init__(self, root: Path | None = None, data: Path | None = None, runs: Path | None = None):
         super().__init__()
         self.setWindowTitle("kg —— 量潮知识工作工具箱")
         self.resize(1040, 660)
         self.root = root or assets_layer.repo_root()
-        self.data = data or task_layer.lab_data()
-        self.tasks = tasks
+        self.data = data or flow_layer.lab_data()
+        self.runs = runs
 
         body = QWidget()
         self.setCentralWidget(body)
@@ -509,7 +509,7 @@ class Window(QMainWindow):
         top.addWidget(self.data_label)
         outer.addLayout(top)
 
-        self.desk = Desk(self.root, self.data, tasks)
+        self.desk = Desk(self.root, self.data, runs)
         self.browser = Browser(self.root)
         tabs = QTabWidget()
         tabs.addTab(self.desk, "台面")
@@ -536,14 +536,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kg-gui", description="量潮知识工作工具箱的窗口版")
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
     parser.add_argument("--data", help="数据仓（默认本仓 data/——工作纪律：所有数据放这里）")
-    parser.add_argument("--tasks", help="任务放哪（默认 <数据仓>/cases）")
+    parser.add_argument("--runs", help="任务放哪（默认 <数据仓>/cases）")
     args = parser.parse_args(argv)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("kg")
     window = Window(
         Path(args.root).resolve() if args.root else None,
         Path(args.data).resolve() if args.data else None,
-        Path(args.tasks).resolve() if args.tasks else None,
+        Path(args.runs).resolve() if args.runs else None,
     )
     window.show()
     return app.exec()

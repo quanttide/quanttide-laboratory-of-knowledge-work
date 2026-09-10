@@ -19,7 +19,7 @@ from kg import assets as assets_layer  # noqa: E402
 from kg import catalog as catalog_layer  # noqa: E402
 from kg import checks as checks_layer  # noqa: E402
 from kg import cli, material as material_layer  # noqa: E402
-from kg import task as task_layer  # noqa: E402
+from kg import workflow as flow_layer  # noqa: E402
 from kg import records  # noqa: E402
 from kg import report  # noqa: E402
 
@@ -95,26 +95,26 @@ def links(real: Path) -> None:
         (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
         (root / "产出.md").write_text("# 产出\n", encoding="utf-8")
         data = Path(tmp) / "data"
-        report.task_new(root, "试一条路", data, None, "把动作串起来")
-        start_state = report.task_status(root, "试一条路", data)
-        test("主轴：开工时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
+        report.run_new(root, "试一条路", data, None, "把动作串起来")
+        start_state = report.run_status(root, "试一条路", data)
+        test("主轴：开工时七格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
         walk = (("material", "data/journal/2026-09-10.md"), ("instruction", "把纪律落下来"), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这个任务。"))
         marks = []
         for action, given in walk:
-            step = report.task_step(root, "试一条路", action, given, data)
+            step = report.run_step(root, "试一条路", action, given, data)
             if action == "instruction":  # 指令要人填步骤与验收，补齐了才点亮
-                one = task_layer.open_task(root, "试一条路", data)
-                one.write(task_layer.TASK_FILE, records.task_template("试一条路", "把纪律落下来").replace("- <怎么走，一步一步>", "- 改落点\n- 写纪律").replace("- [ ] 机械：<能写成断言的> `path:data/journal/README.md`", "- [ ] 机械：纪律在案 `path:data/journal/2026-09-10.md`").replace("- [ ] 闸门：<只能人拍板的>", "- [ ] 闸门：创始人点头"))
-                step = report.task_status(root, "试一条路", data)
+                one = flow_layer.open_run(root, "试一条路", data)
+                one.write(flow_layer.TASK_FILE, records.task_template("试一条路", "把纪律落下来").replace("- <怎么走，一步一步>", "- 改落点\n- 写纪律").replace("- [ ] 机械：<能写成断言的> `path:data/journal/README.md`", "- [ ] 机械：纪律在案 `path:data/journal/2026-09-10.md`").replace("- [ ] 闸门：<只能人拍板的>", "- [ ] 闸门：创始人点头"))
+                step = report.run_status(root, "试一条路", data)
             marks.append([row[1] for row in step.rows].count("✓"))
         test("主轴：七步顺次点亮", marks == [1, 2, 3, 4, 5, 6, 7], f"实得 {marks}")
-        task = task_layer.open_task(root, "试一条路", data)
+        task = flow_layer.open_run(root, "试一条路", data)
         test("主轴：流水记满八条", len(task.events()) == 8, f"实得 {len(task.events())}")
         test("主轴：报告四段都是真的", all(task.report().get(name) for name in records.REPORT_SECTIONS), str(task.report().keys()))
-        test("主轴：数据全落在数据仓里", task.record_file("report").is_relative_to(data / "report") and task.record_file("history").is_relative_to(data / "history") and task.dir.is_relative_to(data / "tasks"), str(task.record_file("report")))
+        test("主轴：数据全落在数据仓里", task.record_file("report").is_relative_to(data / "report") and task.record_file("history").is_relative_to(data / "history") and task.dir.is_relative_to(data / "runs"), str(task.record_file("report")))
         test("主轴：历史是叙事", records.prose(task.record_file("history")) != "")
-        test("主轴：认不得的步骤挡住", not report.task_step(root, "试一条路", "乱来", "", data).ok)
-        test("主轴：列任务报下一步", report.task_list(root, data).rows[0][1] == "完成")
+        test("主轴：认不得的步骤挡住", not report.run_step(root, "试一条路", "乱来", "", data).ok)
+        test("主轴：列任务报下一步", report.run_list(root, data).rows[0][1] == "完成")
 
 
 def gui_smoke(real: Path) -> None:
@@ -154,9 +154,9 @@ def gui_smoke(real: Path) -> None:
         data = Path(tmp) / "data"
         desk = gui.Desk(fake, data)
         test("台面：没有任务时提示起一件", "新建" in desk.next_label.text())
-        task_layer.create(fake, "试一条路", data, None, "把动作串起来")
+        flow_layer.create(fake, "试一条路", data, None, "把动作串起来")
         desk.reload()
-        report.task_step(fake, "试一条路", "material", "data/journal/2026-09-10.md", data)
+        report.run_step(fake, "试一条路", "material", "data/journal/2026-09-10.md", data)
         desk.reload()
         test("台面：状态表跟着走", desk.state_table.item(0, 1).text() == "✓" and desk.state_table.item(1, 1).text() == "—")
         test("台面：流水表有记录", desk.log_table.rowCount() >= 2, f"{desk.log_table.rowCount()} 行")

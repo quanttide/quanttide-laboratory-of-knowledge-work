@@ -1,4 +1,4 @@
-"""契约层：第二大脑应该有什么、叫什么、落在哪。
+"""资产层：第二大脑应该有什么、叫什么、落在哪。
 
 依据量潮第二大脑章程第九条（程序型）与第十三条（陈述型）、第二条（不占格）；
 资产的中文用名是本领域的命名决定，改动即改规范。
@@ -59,7 +59,7 @@ def locate(root: Path, asset: Asset) -> list[Path]:
 
 
 def missing(root: Path) -> list[Asset]:
-    """契约有而目录无的格子。"""
+    """资产表有而工作区无的格子。"""
     return [asset for asset in assets() if not locate(root, asset)]
 
 
