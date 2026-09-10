@@ -9,6 +9,7 @@
   python3 resolver.py 案例 --show 查找并打印内容
   python3 resolver.py --list      列出全部目录条目
   python3 resolver.py --check     对账：契约有而目录无、目录有而契约无
+  python3 resolver.py 日志 --root <其他第二大脑>   换一个工作区扫描
 """
 
 import sys
@@ -40,7 +41,12 @@ def check(root: Path) -> int:
 
 
 def main(argv):
-    root = repo_root()
+    if "--root" in argv:
+        at = argv.index("--root")
+        root = Path(argv[at + 1]).resolve()
+        argv = argv[:at] + argv[at + 2 :]
+    else:
+        root = repo_root()
     if len(argv) > 1 and argv[1] == "--check":
         return check(root)
 
