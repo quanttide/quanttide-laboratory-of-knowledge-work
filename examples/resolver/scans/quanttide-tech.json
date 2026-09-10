@@ -1,6 +1,6 @@
 {
   "root": "quanttide-tech",
-  "count": 1087,
+  "count": 1085,
   "entries": [
     {
       "kind": "报告",
@@ -1880,14 +1880,6 @@
       "names": [
         "qtcloud-think",
         "认知摩擦"
-      ]
-    },
-    {
-      "kind": "洞察",
-      "path": "data/insight/qtcloud/qtcloud-work.md",
-      "names": [
-        "qtcloud-work",
-        "工作云的孵化与毕业"
       ]
     },
     {
@@ -7449,14 +7441,6 @@
       "names": [
         "Data 模块：数据可视化技术设计",
         "data"
-      ]
-    },
-    {
-      "kind": "平台",
-      "path": "apps/qtdata/examples/default/modules/default.md",
-      "names": [
-        "Default 模块：知识工作技术设计",
-        "default"
       ]
     },
     {

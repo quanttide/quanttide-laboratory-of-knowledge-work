@@ -1,6 +1,6 @@
 {
   "root": "quanttide-work",
-  "count": 76,
+  "count": 79,
   "entries": [
     {
       "kind": "报告",
@@ -132,6 +132,14 @@
     },
     {
       "kind": "洞察",
+      "path": "data/insight/catalog.md",
+      "names": [
+        "catalog",
+        "目录"
+      ]
+    },
+    {
+      "kind": "洞察",
       "path": "data/insight/index.md",
       "names": [
         "index",
@@ -144,6 +152,14 @@
       "names": [
         "memory-vs-artifact",
         "记忆与工作物"
+      ]
+    },
+    {
+      "kind": "洞察",
+      "path": "data/insight/qtcloud-work.md",
+      "names": [
+        "qtcloud-work",
+        "工作云的孵化与毕业"
       ]
     },
     {
@@ -616,6 +632,14 @@
         "default",
         "example",
         "实验室"
+      ]
+    },
+    {
+      "kind": "实验室",
+      "path": "examples/default/examples/default-module/default.md",
+      "names": [
+        "Default 模块：知识工作技术设计",
+        "default"
       ]
     }
   ]
