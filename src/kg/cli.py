@@ -17,7 +17,7 @@
 
 任务（工作流的一次执行实例）
   kg task --list                 有哪些任务、跑哪条工作流、下一步
-  kg task --new <名字> --workflow <工作流> [--about 一句话]   起一件任务
+  kg task --new <名字> --workflow <工作流> [--about 一句话]   起一件任务（--about 只是开工记一句）
   kg task <名字>                 看步骤状态与流水
   kg task <名字> --next           走下一步：执行者是 AI 的交给 AI（pi -p）跑，然后跑判据、记账
   kg task <名字> --done <步骤> [--note 一句话]   人为地记一步（人自己做的）

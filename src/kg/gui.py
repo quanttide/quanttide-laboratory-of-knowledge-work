@@ -430,7 +430,7 @@ class Desk(QWidget):
             nxt = self.task.next_step()
             rows = [i for i, step in enumerate(steps) if nxt and step.name == nxt.name]
             self.steps_table.selectRow(rows[0] if rows else 0)
-        self.next_label.setText(f"{self.task.goal()}　|　{task_layer.state_line(self.task)}")
+        self.next_label.setText(f"{self.task.workflow().description}　|　{task_layer.state_line(self.task)}")
         events = self.task.events()
         self.log_table.setRowCount(len(events))
         for row, event in enumerate(reversed(events)):

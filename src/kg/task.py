@@ -3,7 +3,7 @@
 规格：任务（Task）＝过程的一次执行实例；它跑的是某条工作流（workflow.py）。
 
 <数据仓>/
-├── tasks/<任务>.yaml           这一次的指令：跑哪条工作流、要什么
+├── tasks/<任务>.yaml           这一次执行：跑哪条工作流（要什么由工作流的 description 说）
 └── artifacts/                  产物按类型分家，按任务名命名
     ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项，机器写
     ├── history/<任务>.md       历史（叙事）：人写
@@ -73,9 +73,6 @@ class Task:
             return {}
         return loaded if isinstance(loaded, dict) else {}
 
-    def goal(self) -> str:
-        return str(self.payload().get("goal", "")).strip()
-
     def workflow_name(self) -> str:
         return str(self.payload().get("workflow", "")).strip()
 
@@ -115,7 +112,7 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     for kind in (REPORT, JOURNAL, LOG):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(dump({"name": name, "workflow": workflow_name, "goal": about or "<这一次要什么，一句话>"}), encoding="utf-8")
+        task.file.write_text(dump({"name": name, "workflow": workflow_name}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(JOURNAL).is_file():
@@ -140,8 +137,9 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 
 工作区：{task.root}
 数据仓：{task.data}
-任务：{task.name}（目标：{task.goal() or "（没写）"}）
-工作流：{task.workflow_name()}（步骤：{steps}）
+任务：{task.name}（工作流的一次执行）
+工作流：{task.workflow_name()}——{task.workflow().description}
+步骤：{steps}
 这一步：{step.name}
 做什么：
 {step.description}

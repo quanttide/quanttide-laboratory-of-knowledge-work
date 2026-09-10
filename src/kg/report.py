@@ -219,8 +219,8 @@ def task_status(root: Path, data: Path, name: str) -> Result:
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     done = task.done()
     result = Result(columns=("步骤", "状态"), lines=[f"任务：{task.name}"])
-    result.lines.append(f"  目标：{task.goal() or '（没写）'}")
-    result.lines.append(f"  工作流：{task.workflow_name()}（{len(task.steps())} 个步骤）")
+    result.lines.append(f"  工作流：{task.workflow_name()}——{task.workflow().description}")
+    result.lines.append(f"  步骤：{len(task.steps())} 个")
     for step in task.steps():
         state = "✓" if step.name in done else "—"
         result.rows.append((step.name, state))

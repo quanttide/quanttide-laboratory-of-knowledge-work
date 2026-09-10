@@ -85,8 +85,8 @@ $ kg workflow --import ~/流程/课程档案比对.yaml --as 课程档案比对�
 ## 二、起一件任务（复用）
 
 ```bash
-$ kg task --new 课程档案比对 --workflow 课程档案比对 --about "比对 work 侧与课程研发档案"
-起了：…/data/tasks/课程档案比对.md
+$ kg task --new 课程档案比对 --workflow 课程档案比对 --about "开工记一句"
+起了：…/data/tasks/课程档案比对.yaml
 ```
 
 **同一条工作流可以起任意多件任务**：任务＝它的一次执行，各自有步骤状态、流水与产物，互不串。工作流文件拷到别的 `--data`，整套做法就跟着过去。
@@ -134,7 +134,7 @@ $ kg task 课程档案比对 --journal "先找齐两边，再按口径 / 重叠 
 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
-data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流、要什么
+data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流（要什么由工作流的 description 说）
 data/tasks/<任务>.jsonl          流水：跟着任务走（只增不改）
 data/artifacts/report/<任务>.md   报告：程序维护「执行记录」「闸门项」两节，其余节是人 / AI 写的产物
 data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙去脉
