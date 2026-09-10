@@ -1,4 +1,3 @@
-name: 三类判据
 description: 试三种判据：rule 当场判、agent 照判准审、human 留给人
 steps:
 - name: 写一句

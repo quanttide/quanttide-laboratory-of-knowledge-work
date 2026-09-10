@@ -8,8 +8,8 @@
 
 ```text
 data/
-├── workflows/<工作流>.yaml      工作流：串联的步骤（name / what / executor / judges）
-├── tasks/<任务>.yaml            任务：工作流的一次执行（name、workflow）
+├── workflows/<工作流>.yaml      工作流：串联的步骤（description / steps；名在文件名里）
+├── tasks/<任务>.yaml            任务：工作流的一次执行（只有一行 workflow；名在文件名里）
 ├── tasks/<任务>.jsonl           流水：跟着任务走（只增不改）
 └── artifacts/                 产物按类型分家，按任务名命名（可维护）
     ├── report/<任务>.md        报告：程序只维护「执行记录」「闸门项」两节，别的节归人 / AI

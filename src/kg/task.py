@@ -3,7 +3,7 @@
 规格：任务（Task）＝过程的一次执行实例；它跑的是某条工作流（workflow.py）。
 
 <数据仓>/
-├── tasks/<任务>.yaml           这一次执行：跑哪条工作流（要什么由工作流的 description 说）
+├── tasks/<任务>.yaml           这一次执行：只有一行 workflow（文件名即任务名，要什么由工作流的 description 说）
 └── artifacts/                  产物按类型分家，按任务名命名
     ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项，机器写
     ├── history/<任务>.md       历史（叙事）：人写
@@ -112,7 +112,7 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     for kind in (REPORT, JOURNAL, LOG):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(dump({"name": name, "workflow": workflow_name}), encoding="utf-8")
+        task.file.write_text(dump({"workflow": workflow_name}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(JOURNAL).is_file():
