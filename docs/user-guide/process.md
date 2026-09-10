@@ -22,14 +22,14 @@ steps:
       - executor: rule          # rule：规则引擎按字段判（看什么 + 要什么）
         note: 个人课程档案在
         path: data/profile/iGuo/course/index.md
-      - type: rule
+      - executor: rule
         note: 课程研发档案在
         path: /home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
   - name: 核对
     description: 逐项对照，落成一件产物
     executor: human             # 要人做必须显式写
     criteria:
-      - type: rule
+      - executor: rule
         note: 产物落成
         path: examples/default/data/artifacts/课程档案比对/比对.md
       - executor: rule          # 文件含这段文字（file + contains 成对）
@@ -144,7 +144,7 @@ data/artifacts/<任务>/         产物：log.jsonl（流水）、report.md（�
 
 ## 规矩
 
-- **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `type: human` 的判据上（拍板）；
+- **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `executor: human` 的判据上（拍板）；
 - **智能体不能审自己那一步**——同一步的执行者与判据若是同一个智能体，等于自评自过（现在实现里是同一个 pi，流水里标了「AI 审查（同一模型）」，将来要换成另一个执行者）；
 
 - **数据全落 `data/`**（workflows / tasks / artifacts 三家），不写实验室外面；
