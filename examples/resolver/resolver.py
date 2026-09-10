@@ -37,7 +37,7 @@ ASSETS = (
     ("平台", "apps"),
     ("教程", "docs/tutorial"),
     ("札记", "docs/essay"),
-    ("示例", "examples/default"),
+    ("实验室", "examples/default"),
 )
 
 SKIP = {".git", "node_modules", ".venv", "build", "dist", ".dart_tool", "__pycache__"}
