@@ -28,7 +28,7 @@ $ kg workflow 课程档案比对
 ### 比对
 
 - 做什么：把两边逐项比一遍
-- [ ] 机械：产物落成 `path:examples/default/data/artifacts/课程档案比对/比对.md`
+- [ ] 机械：产物落成 `path:examples/default/data/artifacts/report/比对.md`
 - [ ] 闸门：创始人点头
 ```
 
@@ -58,7 +58,9 @@ $ kg task 课程档案比对 --history "先找齐两边，再按四条比……"
 ```text
 data/workflows/<工作流>.md     定义：串联的步骤与判据
 data/tasks/<任务>.md           实例：跑哪条工作流、要什么
-data/artifacts/<任务>/         产物：log.jsonl、report.md、history.md
+data/artifacts/report/<任务>.md   报告（事件）
+data/artifacts/history/<任务>.md  历史（叙事）
+data/artifacts/log/<任务>.jsonl   流水
 ```
 
 ## 窗口

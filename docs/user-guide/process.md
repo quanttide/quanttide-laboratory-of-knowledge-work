@@ -31,9 +31,9 @@ steps:
     criteria:
       - executor: rule
         note: 产物落成
-        path: examples/default/data/artifacts/课程档案比对/比对.md
+        path: examples/default/data/artifacts/report/比对.md
       - executor: rule          # 文件含这段文字（file + contains 成对）
-        file: examples/default/data/artifacts/课程档案比对/比对.md
+        file: examples/default/data/artifacts/report/比对.md
         contains: "## 结论"
       - executor: agent         # agent：智能体照 description 的判准审
         note: 两边口径是否对齐
