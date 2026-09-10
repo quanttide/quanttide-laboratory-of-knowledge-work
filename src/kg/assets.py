@@ -63,6 +63,25 @@ def missing(root: Path) -> list[Asset]:
     return [asset for asset in assets() if not locate(root, asset)]
 
 
+def make(root: Path, wanted: list[Asset] | None = None) -> list[Path]:
+    """补建缺的格子：文档类建 data/ 或 docs/ 下的同名目录，各带一份 README。
+
+    独立仓库那三格（工具箱、平台、实验室）不凭空建——它们是另外的仓库。
+    """
+    stated = {name for _, name in STATED}
+    created = []
+    for asset in missing(root) if wanted is None else wanted:
+        if asset.name in LOCATION:
+            continue
+        path = root / ("data" if asset.name in stated else "docs") / asset.name
+        path.mkdir(parents=True, exist_ok=True)
+        readme = path / "README.md"
+        if not readme.is_file():
+            readme.write_text(f"# 量潮知识工作{asset.kind}\n", encoding="utf-8")
+        created.append(path)
+    return created
+
+
 def repo_root(start: Path | None = None) -> Path:
     """工作区根：从起点往上找，直到看见数据层。"""
     d = (start or Path.cwd()).resolve()

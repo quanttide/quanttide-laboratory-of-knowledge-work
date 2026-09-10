@@ -56,17 +56,34 @@ class Spec:
     payload: object = None
 
 
-# 分四组：工作区看整体，查看看一件，契约与案卷各管一种记录
+OPTIONAL = ()
+
+
+def optional(field: str) -> str:
+    """可选字段的名字：去掉「（可留空）」就是它的本来面目。"""
+    return field.replace("（可留空）", "")
+
+
+def value(values: dict, field: str) -> str:
+    return values.get(field, "").strip()
+
+
+# 分五组：一件事是主轴，工作区看整体，查看看一件，契约与案卷各管一种记录
 SPECS = (
+    Spec("一件事", "起一件事", "写出材料 / 契约 / 产出 / 案卷四段骨架", ("目标文件",), lambda root, v: report.case_new(Path(value(v, "目标文件")))),
+    Spec("一件事", "看一件事", "走到哪一步、有没有断链、下一步做什么", ("一件事文件",), lambda root, v: report.case(root, Path(value(v, "一件事文件")))),
     Spec("工作区", "目录", "列全部条目——契约 × 目录", (), lambda root, v: report.catalog(root), "目录.json", lambda root, v: report.catalog_payload(root)),
-    Spec("工作区", "审计", "契约有而工作区无、工作区有而契约无", (), lambda root, v: report.audit(root), "审计.json", lambda root, v: report.audit_payload(root)),
-    Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, v["名字"], v["看正文"])),
+    Spec("工作区", "审计", "契约有而工作区无、工作区有而契约无", ("补建缺的资产",), lambda root, v: report.audit(root, make=bool(v.get("补建缺的资产"))), "审计.json", lambda root, v: report.audit_payload(root)),
+    Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, value(v, "名字"), bool(v.get("看正文")))),
     Spec("查看", "看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
-    Spec("契约", "写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.CONTRACT_TEMPLATE)),
-    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件",), lambda root, v: report.audit_contract(root, Path(v["契约文件"]))),
-    Spec("案卷", "写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.DOSSIER_TEMPLATE)),
-    Spec("案卷", "核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(v["案卷文件"]))),
+    Spec("契约", "写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_contract(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
+    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件", "写入案卷（可留空）"), lambda root, v: report.audit_contract(root, Path(value(v, "契约文件")), Path(value(v, "写入案卷（可留空）")) if value(v, "写入案卷（可留空）") else None)),
+    Spec("案卷", "写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_dossier(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
+    Spec("案卷", "核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(value(v, "案卷文件")))),
 )
+
+# 这些动作的结果是一张带路径的表，可以拿选中那行去立契约
+CAN_ABOUT = ("目录", "找文档", "看材料")
 
 
 class Window(QMainWindow):
@@ -127,6 +144,9 @@ class Window(QMainWindow):
         self.export_button = QPushButton("导出…")
         self.export_button.clicked.connect(self._export)
         buttons.addWidget(self.export_button)
+        self.about_button = QPushButton("以选中项立契约")
+        self.about_button.clicked.connect(self._contract_about)
+        buttons.addWidget(self.about_button)
         buttons.addStretch(1)
         right.addLayout(buttons)
 
@@ -184,10 +204,11 @@ class Window(QMainWindow):
                 widget.deleteLater()
         self.widgets = {}
         for field in self.spec.fields:
-            if field == "看正文":
+            if field == "看正文" or field == "补建缺的资产":
                 widget = QCheckBox()
+                widget.setChecked(False)
                 self.widgets[field] = widget
-            elif field.endswith("文件"):
+            elif optional(field).endswith("文件") or optional(field) in ("以它为题", "写入案卷"):
                 widget = self._with_browse(field)
             else:
                 widget = QLineEdit()
@@ -195,6 +216,7 @@ class Window(QMainWindow):
                 self.widgets[field] = widget
             self.form.addRow(field, widget)
         self.export_button.setVisible(bool(self.spec.export))
+        self.about_button.setVisible(self.spec.name in CAN_ABOUT)
         self.hint_label.setText(self.spec.hint)
         self.show_result(report.Result(lines=[f"{self.spec.name}：{self.spec.hint}"]))
         self.statusBar().showMessage(self.spec.hint)
@@ -206,12 +228,12 @@ class Window(QMainWindow):
         layout = QHBoxLayout(box)
         layout.setContentsMargins(0, 0, 0, 0)
         edit = QLineEdit()
-        edit.setPlaceholderText(field.replace("文件", "路径"))
+        edit.setPlaceholderText("可留空" if field != optional(field) else "路径")
         layout.addWidget(edit, 1)
         button = QPushButton("浏览…")
 
         def choose() -> None:
-            if field == "目标文件":
+            if optional(field) in ("目标文件", "写入案卷"):
                 path, _ = QFileDialog.getSaveFileName(self, "写到哪", str(self.root), "Markdown (*.md)")
             else:
                 path, _ = QFileDialog.getOpenFileName(self, "选文件", str(self.root), "Markdown (*.md)")
@@ -236,7 +258,7 @@ class Window(QMainWindow):
     def run_current(self) -> report.Result:
         values = self.values()
         for field in self.spec.fields:
-            if field not in ("看正文", "材料路径") and not values[field]:
+            if field not in ("看正文", "补建缺的资产", "材料路径") and field == optional(field) and not values[field]:
                 result = report.Result(ok=False, lines=[f"请先填「{field}」"])
                 self.show_result(result)
                 return result
@@ -277,6 +299,29 @@ class Window(QMainWindow):
         payload = self.spec.payload(self.root, self.values())
         catalog_layer.write_json(Path(path), payload)
         self.statusBar().showMessage(f"已导出：{path}")
+
+    def _selected_path(self) -> str:
+        """选中那一行里像路径的格子。"""
+        row = self.table.currentRow()
+        if row < 0:
+            return ""
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            if item and ("/" in item.text() or item.text().endswith(".md")):
+                return item.text()
+        return ""
+
+    def _contract_about(self) -> None:
+        about = self._selected_path()
+        if not about:
+            self.statusBar().showMessage("先在表里选一行")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, f"以「{about}」为题立契约", str(self.root), "Markdown (*.md)")
+        if not path:
+            return
+        result = report.new_contract(Path(path), about)
+        self.show_result(result)
+        self.statusBar().showMessage("；".join(result.lines))
 
     def _open_row(self, row: int) -> None:
         for col in range(self.table.columnCount()):

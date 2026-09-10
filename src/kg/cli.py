@@ -1,20 +1,24 @@
-"""入口：一个程序，九个动作（含开图形界面）。
+"""入口：一个程序，十个动作（含开图形界面）。
 
 工作区
   kg catalog [--json 文件]       看目录 / 导出目录
-  kg audit [--json 文件]         审计——契约有而工作区无、工作区有而契约无
+  kg audit [--json 文件] [--make]  审计——契约有而工作区无、工作区有而契约无；--make 补建缺的格子
 
 查看
   kg find <名字> [--show]        按名找文档——认文件名与中文标题
   kg material [路径…] [--json]   看材料——类型、内容、来源、时间、阶段
 
 契约
-  kg new-contract <文件>         写契约骨架（目标 / 输出形态 / 必须包含 / 检查项）
-  kg audit-contract <文件>       核对契约——段位齐全、跑机械核对、列出闸门项
+  kg new-contract <文件> [--about 路径]   写契约骨架；--about 以某件东西为题
+  kg audit-contract <文件> [--into 案卷]  核对契约；--into 把审查者报告写进案卷
 
 案卷
-  kg new-dossier <文件>          写案卷骨架（产出 / 审查 / 裁决 / 成果）
+  kg new-dossier <文件> [--about 标题]    写案卷骨架
   kg audit-dossier <文件>        核对案卷——段位齐全
+
+一件事
+  kg case <文件>                 看这件事走到哪一步、下一步做什么
+  kg case --new <文件>           起一件事（材料 / 契约 / 产出 / 案卷）
 
   kg gui                         开图形界面（同一个程序的窗口版）
 
@@ -27,7 +31,6 @@ from pathlib import Path
 
 from . import assets as assets_layer
 from . import catalog as catalog_layer
-from . import records
 from . import report
 
 
@@ -53,7 +56,7 @@ def cmd_catalog(root: Path, args) -> int:
 def cmd_audit(root: Path, args) -> int:
     if args.json:
         catalog_layer.write_json(Path(args.json), report.audit_payload(root))
-    return emit(report.audit(root))
+    return emit(report.audit(root, make=args.make))
 
 
 def cmd_material(root: Path, args) -> int:
@@ -66,15 +69,21 @@ def cmd_material(root: Path, args) -> int:
 
 
 def cmd_new_contract(root: Path, args) -> int:
-    return emit(report.new_record(Path(args.target), records.CONTRACT_TEMPLATE))
+    return emit(report.new_contract(Path(args.target), args.about))
 
 
 def cmd_new_dossier(root: Path, args) -> int:
-    return emit(report.new_record(Path(args.target), records.DOSSIER_TEMPLATE))
+    return emit(report.new_dossier(Path(args.target), args.about))
 
 
 def cmd_audit_contract(root: Path, args) -> int:
-    return emit(report.audit_contract(root, Path(args.target)))
+    return emit(report.audit_contract(root, Path(args.target), Path(args.into) if args.into else None))
+
+
+def cmd_case(root: Path, args) -> int:
+    if args.new:
+        return emit(report.case_new(Path(args.target or ""), args.about))
+    return emit(report.case(root, Path(args.target or "")))
 
 
 def cmd_audit_dossier(root: Path, args) -> int:
@@ -108,15 +117,26 @@ def build_parser() -> argparse.ArgumentParser:
 
     audit = sub.add_parser("audit", help="审计工作区")
     audit.add_argument("--json", metavar="文件")
+    audit.add_argument("--make", action="store_true", help="补建缺的资产格子")
 
     material = sub.add_parser("material", help="看材料")
     material.add_argument("paths", nargs="*", metavar="路径")
     material.add_argument("--json", metavar="文件")
 
-    for name, help_text in (("new-contract", "写契约骨架"), ("new-dossier", "写案卷骨架")):
-        sub.add_parser(name, help=help_text).add_argument("target", metavar="文件")
-    for name, help_text in (("audit-contract", "核对契约"), ("audit-dossier", "核对案卷")):
-        sub.add_parser(name, help=help_text).add_argument("target", metavar="文件")
+    contract = sub.add_parser("new-contract", help="写契约骨架")
+    contract.add_argument("target", metavar="文件")
+    contract.add_argument("--about", default="", metavar="路径", help="以某件已有的东西为题")
+    dossier = sub.add_parser("new-dossier", help="写案卷骨架")
+    dossier.add_argument("target", metavar="文件")
+    dossier.add_argument("--about", default="", metavar="标题")
+    checking = sub.add_parser("audit-contract", help="核对契约")
+    checking.add_argument("target", metavar="文件")
+    checking.add_argument("--into", metavar="案卷", help="把审查者报告写进这份案卷")
+    sub.add_parser("audit-dossier", help="核对案卷").add_argument("target", metavar="文件")
+    case = sub.add_parser("case", help="看一件事 / 起一件事")
+    case.add_argument("target", nargs="?", metavar="文件")
+    case.add_argument("--new", action="store_true", help="起一件事（写出四段骨架）")
+    case.add_argument("--about", default="", metavar="标题")
     sub.add_parser("gui", help="开图形界面")
     return parser
 
@@ -130,6 +150,7 @@ HANDLERS = {
     "new-dossier": cmd_new_dossier,
     "audit-contract": cmd_audit_contract,
     "audit-dossier": cmd_audit_dossier,
+    "case": cmd_case,
     "gui": cmd_gui,
 }
 
