@@ -1,7 +1,8 @@
 """文档解析器：按章程的资产类型，用命名找到一件文档。
 
-资产表见下方 ASSETS——量潮第二大脑章程第九条、第十三条的二十格格子在本仓的落点；
-目录名与资产类型一一对应。
+资产表见下方：章程第九条、第十三条的二十格，中文名是本领域用名，落点按命名规则推导
+（文档类 data/ 或 docs/ 同名目录；工具箱、平台、实验室为独立仓库，按 packages/*-toolkit、
+apps/*、examples/* 找）。
 
 命名规则：文件名用英文、篇内标题用中文，二者不互译——所以按名查找同时认文件名与标题。
 
@@ -17,28 +18,37 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-ASSETS = (
-    ("报告", "data/report"),
-    ("参考", "data/library"),
-    ("历史", "data/history"),
-    ("日志", "data/journal"),
-    ("档案", "data/profile"),
-    ("宣传册", "data/brochure"),
-    ("路线图", "data/roadmap"),
-    ("洞察", "data/insight"),
-    ("意图", "data/intention"),
-    ("语境", "data/context"),
-    ("归档", "data/archive"),
-    ("章程", "docs/bylaw"),
-    ("规格", "docs/specification"),
-    ("工具箱", "packages/quanttide-work-toolkit"),
-    ("手册", "docs/handbook"),
-    ("案例", "docs/gallery"),
-    ("平台", "apps"),
-    ("教程", "docs/tutorial"),
-    ("札记", "docs/essay"),
-    ("实验室", "examples/default"),
+STATED = (  # 陈述型九宫格（章程第十三条）与不占格资产（章程第二条）
+    ("报告", "report"),
+    ("参考", "library"),
+    ("历史", "history"),
+    ("日志", "journal"),
+    ("档案", "profile"),
+    ("宣传册", "brochure"),
+    ("路线图", "roadmap"),
+    ("洞察", "insight"),
+    ("意图", "intention"),
+    ("语境", "context"),
+    ("归档", "archive"),
 )
+
+PROCEDURAL = (  # 程序型九宫格（章程第九条）
+    ("章程", "bylaw"),
+    ("规格", "specification"),
+    ("工具箱", "toolkit"),
+    ("手册", "handbook"),
+    ("案例", "gallery"),
+    ("平台", "platform"),
+    ("教程", "tutorial"),
+    ("札记", "essay"),
+    ("实验室", "example"),
+)
+
+LOCATION = {  # 非同名目录的三类，按命名规则找独立仓库
+    "toolkit": "packages/*-toolkit",
+    "platform": "apps/*",
+    "example": "examples/*",
+}
 
 SKIP = {".git", "node_modules", ".venv", "build", "dist", ".dart_tool", "__pycache__"}
 
@@ -87,18 +97,24 @@ def docs_under(path: Path):
         yield md
 
 
+def locate(root: Path, asset: str) -> list[Path]:
+    """资产的落点：文档类入 data/ 或 docs/，独立仓库按 LOCATION 的命名规则找。"""
+    for candidate in (root / "data" / asset, root / "docs" / asset):
+        if candidate.is_dir():
+            return [candidate]
+    return sorted(root.glob(LOCATION[asset])) if asset in LOCATION else []
+
+
 def build_index(root: Path) -> list[Entry]:
     index = []
-    for kind, rel in ASSETS:
-        path = root / rel
-        if not path.is_dir():
-            continue
-        index.append(Entry(kind, path, {kind, path.name} | ({n} if (n := cn_name(path)) else set())))
-        for md in docs_under(path):
-            names = {md.stem}
-            if title := title_of(md):
-                names.add(title)
-            index.append(Entry(kind, md, names))
+    for kind, asset in STATED + PROCEDURAL:
+        for path in locate(root, asset):
+            index.append(Entry(kind, path, {kind, asset, path.name} | ({n} if (n := cn_name(path)) else set())))
+            for md in docs_under(path):
+                names = {md.stem}
+                if title := title_of(md):
+                    names.add(title)
+                index.append(Entry(kind, md, names))
     return index
 
 
@@ -114,7 +130,7 @@ def find(index: list[Entry], query: str) -> list[Entry]:
 def main(argv):
     root = repo_root()
     if len(argv) > 1 and argv[1] == "--check":
-        missing = [f"{kind}（{rel}）" for kind, rel in ASSETS if not (root / rel).is_dir()]
+        missing = [f"{kind}（{asset}）" for kind, asset in STATED + PROCEDURAL if not locate(root, asset)]
         print("资产齐备：二十格全在。" if not missing else "缺资产：" + "、".join(missing))
         return 1 if missing else 0
 
