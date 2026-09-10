@@ -1,14 +1,7 @@
-"""文档解析器：按量潮的目录规则，用命名找到一件文档。
+"""文档解析器：按章程的资产类型，用命名找到一件文档。
 
-目录规则（quanttide-work）：
-  data/{产物}/         产物：context、journal、profile、intention、insight、roadmap
-  data/{资产}/         资产：archive、brochure、history、library、report
-  docs/specification/{piece,process,place}/   概念规格
-  docs/handbook/artifacts/                    规范
-  docs/gallery/artifacts/                     案例
-  docs/gallery/workflows/                     流程案例
-  docs/{bylaw,essay,tutorial}/                章程、文集、教程
-  examples/default/                           实验室（内部结构自由，这里索引其 examples/ 下各例）
+资产表见下方 ASSETS——量潮第二大脑章程第九条、第十三条的二十格格子在本仓的落点；
+目录名与资产类型一一对应。
 
 命名规则：文件名用英文、篇内标题用中文，二者不互译——所以按名查找同时认文件名与标题。
 
@@ -16,6 +9,7 @@
   python3 resolver.py 材料        按名查找（认文件名与标题）
   python3 resolver.py 案例 --show 查找并打印内容
   python3 resolver.py --list      列出全部索引
+  python3 resolver.py --check     核对资产表在本仓是否齐备
 """
 
 import re
@@ -23,15 +17,30 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-PRODUCTS = {"context", "journal", "profile", "intention", "insight", "roadmap"}
-DOCS = (("章程", "bylaw"), ("文集", "essay"), ("教程", "tutorial"))
-RULES = (
-    ("规格", "docs/specification/*/*.md"),
-    ("规范", "docs/handbook/artifacts/*.md"),
-    ("案例", "docs/gallery/artifacts/*.md"),
-    ("流程", "docs/gallery/workflows/*.md"),
-    ("实验", "examples/default/examples/*"),
+ASSETS = (
+    ("报告", "data/report"),
+    ("参考", "data/library"),
+    ("历史", "data/history"),
+    ("日志", "data/journal"),
+    ("档案", "data/profile"),
+    ("宣传册", "data/brochure"),
+    ("路线图", "data/roadmap"),
+    ("洞察", "data/insight"),
+    ("意图", "data/intention"),
+    ("语境", "data/context"),
+    ("归档", "data/archive"),
+    ("章程", "docs/bylaw"),
+    ("标准", "docs/specification"),
+    ("工具箱", "packages/quanttide-work-toolkit"),
+    ("手册", "docs/handbook"),
+    ("案例", "docs/gallery"),
+    ("平台", "apps"),
+    ("教程", "docs/tutorial"),
+    ("札记", "docs/essay"),
+    ("示例", "examples/default"),
 )
+
+SKIP = {".git", "node_modules", ".venv", "build", "dist", ".dart_tool", "__pycache__"}
 
 
 @dataclass
@@ -59,40 +68,37 @@ def title_of(path: Path) -> str | None:
 
 
 def cn_name(path: Path) -> str | None:
-    """目录的中文名：README 里「量潮知识工作X」的 X（标题形式或「X——」形式）。"""
+    """仓库的中文名：README 里「量潮知识工作X」。"""
     readme = path / "README.md"
     if not readme.is_file():
         return None
     for line in readme.read_text(encoding="utf-8").splitlines():
-        if line.startswith("# 量潮知识工作"):
-            return line[len("# 量潮知识工作"):].strip()
-        if (m := re.search(r"量潮知识工作(.{1,8})——", line)) and not line.startswith("#"):
-            return m.group(1)
+        for pattern in (r"^# 量潮知识工作(.+)$", r"量潮知识工作(.{1,8})——"):
+            if m := re.match(pattern, line):
+                return m.group(1).strip()
     return None
+
+
+def docs_under(path: Path):
+    """资产下的文档：Markdown，跳过构建目录与仓库门面（README/CHANGELOG）。"""
+    for md in sorted(path.rglob("*.md")):
+        if SKIP & set(md.parts) or md.name in {"README.md", "CHANGELOG.md", "LICENSE"}:
+            continue
+        yield md
 
 
 def build_index(root: Path) -> list[Entry]:
     index = []
-    for path in sorted((root / "data").glob("*")):
-        if path.is_dir():
-            names = {path.name} | ({n} if (n := cn_name(path)) else set())
-            index.append(Entry("产物" if path.name in PRODUCTS else "资产", path, names))
-    for kind, sub in DOCS:
-        directory = root / "docs" / sub
-        index.append(Entry(kind, directory, {sub, kind} | ({n} if (n := cn_name(directory)) else set())))
-        for path in sorted(directory.glob("*.md")):
-            if path.name == "README.md":
-                continue  # 仓库门面
-            index.append(Entry(kind, path, {path.stem} | ({t} if (t := title_of(path)) else set())))
-    for kind, pattern in RULES:
-        for path in sorted(root.glob(pattern)):
-            if path.is_dir():
-                index.append(Entry(kind, path, {path.name}))
-                continue
-            names = {path.stem}
-            if title := title_of(path):
+    for kind, rel in ASSETS:
+        path = root / rel
+        if not path.is_dir():
+            continue
+        index.append(Entry(kind, path, {kind, path.name} | ({n} if (n := cn_name(path)) else set())))
+        for md in docs_under(path):
+            names = {md.stem}
+            if title := title_of(md):
                 names.add(title)
-            index.append(Entry(kind, path, names))
+            index.append(Entry(kind, md, names))
     return index
 
 
@@ -107,6 +113,11 @@ def find(index: list[Entry], query: str) -> list[Entry]:
 
 def main(argv):
     root = repo_root()
+    if len(argv) > 1 and argv[1] == "--check":
+        missing = [f"{kind}（{rel}）" for kind, rel in ASSETS if not (root / rel).is_dir()]
+        print("资产齐备：二十格全在。" if not missing else "缺资产：" + "、".join(missing))
+        return 1 if missing else 0
+
     index = build_index(root)
     if len(argv) < 2 or argv[1] == "--list":
         for entry in index:
