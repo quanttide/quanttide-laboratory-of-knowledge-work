@@ -4,6 +4,7 @@
 因为命名规则规定英文文件名与中文标题不互译。
 """
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,23 @@ class Catalog:
         if exact:
             return exact
         return [e for e in self.entries if any(q in n or n in q for n in hits(e))]
+
+    def dump(self, root: Path, target: Path) -> None:
+        """目录的自带格式：JSON——每条含种类、路径与全部名字。"""
+        payload = {
+            "root": root.name,
+            "count": len(self.entries),
+            "entries": [
+                {
+                    "kind": entry.kind,
+                    "path": str(entry.path.relative_to(root)) if entry.path.is_relative_to(root) else str(entry.path),
+                    "names": sorted(entry.names),
+                }
+                for entry in self.entries
+            ],
+        }
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     def unregistered(self, root: Path) -> list[Path]:
         """目录有而契约无：未登记在资产表里的顶层目录。"""

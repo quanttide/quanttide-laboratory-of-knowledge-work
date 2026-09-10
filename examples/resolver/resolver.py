@@ -10,7 +10,7 @@
   python3 resolver.py --list      列出全部目录条目
   python3 resolver.py --check     对账：契约有而目录无、目录有而契约无
   python3 resolver.py 日志 --root <其他第二大脑>   换一个工作区扫描
-  python3 resolver.py --check --save 报告.md      把对账与目录导出成 Markdown
+  python3 resolver.py --save 目录.json            导出目录（程序自带格式）
 """
 
 import sys
@@ -41,27 +41,6 @@ def check(root: Path) -> int:
     return 1 if (missing or unregistered) else 0
 
 
-def report(root: Path, catalog) -> str:
-    """把对账与目录写成 Markdown，便于在编辑器里读。"""
-    missing = contract.missing(root)
-    unregistered = catalog.unregistered(root)
-    lines = [f"# 目录报告：{root.name}", "", f"仓库：`{root}`", f"条目：{len(catalog.entries)}", ""]
-    lines += ["## 对账", ""]
-    lines += [f"- 缺资产：{asset.kind}（{asset.name}）" for asset in missing] or ["- 缺资产：无"]
-    lines += [f"- 未登记：{path.relative_to(root)}" for path in unregistered] or ["- 未登记：无"]
-    lines += ["", "## 资产落点", ""]
-    for asset in contract.assets():
-        paths = contract.locate(root, asset)
-        where = "、".join(f"`{p.relative_to(root)}`" for p in paths) if paths else "（缺）"
-        count = sum(1 for e in catalog.entries if e.kind == asset.kind)
-        lines.append(f"- {asset.kind}（{asset.name}）：{where}——{count} 条")
-    lines += ["", "## 全部条目", ""]
-    for entry in catalog.entries:
-        names = "／".join(sorted(entry.names))
-        lines.append(f"- [{entry.kind}] `{entry.path.relative_to(root)}`  {names}")
-    return "\n".join(lines) + "\n"
-
-
 def main(argv):
     if "--root" in argv:
         at = argv.index("--root")
@@ -74,11 +53,9 @@ def main(argv):
 
     catalog = catalog_layer.build(root)
     if "--save" in argv:
-        at = argv.index("--save")
-        target = Path(argv[at + 1])
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(report(root, catalog), encoding="utf-8")
-        print(f"已保存：{target}")
+        target = Path(argv[argv.index("--save") + 1])
+        catalog.dump(root, target)
+        print(f"已保存：{target}（{len(catalog.entries)} 条）")
         return 0
     if len(argv) < 2 or argv[1] == "--list":
         for entry in catalog.entries:

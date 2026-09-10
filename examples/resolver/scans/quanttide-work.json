@@ -1,0 +1,622 @@
+{
+  "root": "quanttide-work",
+  "count": 76,
+  "entries": [
+    {
+      "kind": "报告",
+      "path": "data/report",
+      "names": [
+        "report",
+        "报告"
+      ]
+    },
+    {
+      "kind": "参考",
+      "path": "data/library",
+      "names": [
+        "library",
+        "参考"
+      ]
+    },
+    {
+      "kind": "历史",
+      "path": "data/history",
+      "names": [
+        "history",
+        "历史"
+      ]
+    },
+    {
+      "kind": "日志",
+      "path": "data/journal",
+      "names": [
+        "journal",
+        "日志",
+        "量潮知识工作日志"
+      ]
+    },
+    {
+      "kind": "日志",
+      "path": "data/journal/iGuo/2026-09-10.md",
+      "names": [
+        "2026-09-10"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile",
+      "names": [
+        "profile",
+        "档案"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile/iGuo/course/index.md",
+      "names": [
+        "index",
+        "量潮课堂"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile/iGuo/course/knowledge-work.md",
+      "names": [
+        "knowledge-work",
+        "知识工作"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile/iGuo/course/production-internship.md",
+      "names": [
+        "production-internship",
+        "生产实习"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile/iGuo/default.md",
+      "names": [
+        "default",
+        "默认分类"
+      ]
+    },
+    {
+      "kind": "档案",
+      "path": "data/profile/iGuo/org.md",
+      "names": [
+        "org",
+        "组织管理"
+      ]
+    },
+    {
+      "kind": "宣传册",
+      "path": "data/brochure",
+      "names": [
+        "brochure",
+        "宣传册"
+      ]
+    },
+    {
+      "kind": "路线图",
+      "path": "data/roadmap",
+      "names": [
+        "roadmap",
+        "路线图"
+      ]
+    },
+    {
+      "kind": "路线图",
+      "path": "data/roadmap/index.md",
+      "names": [
+        "index",
+        "路线图"
+      ]
+    },
+    {
+      "kind": "路线图",
+      "path": "data/roadmap/qtcloud-work/material.md",
+      "names": [
+        "material",
+        "材料（material）"
+      ]
+    },
+    {
+      "kind": "洞察",
+      "path": "data/insight",
+      "names": [
+        "insight",
+        "洞察"
+      ]
+    },
+    {
+      "kind": "洞察",
+      "path": "data/insight/index.md",
+      "names": [
+        "index",
+        "洞察"
+      ]
+    },
+    {
+      "kind": "洞察",
+      "path": "data/insight/memory-vs-artifact.md",
+      "names": [
+        "memory-vs-artifact",
+        "记忆与工作物"
+      ]
+    },
+    {
+      "kind": "意图",
+      "path": "data/intention",
+      "names": [
+        "intention",
+        "意图"
+      ]
+    },
+    {
+      "kind": "意图",
+      "path": "data/intention/index.md",
+      "names": [
+        "index",
+        "意图"
+      ]
+    },
+    {
+      "kind": "语境",
+      "path": "data/context",
+      "names": [
+        "context",
+        "语境"
+      ]
+    },
+    {
+      "kind": "语境",
+      "path": "data/context/iGuo/2026-09-10.md",
+      "names": [
+        "2026-09-10"
+      ]
+    },
+    {
+      "kind": "归档",
+      "path": "data/archive",
+      "names": [
+        "archive",
+        "归档"
+      ]
+    },
+    {
+      "kind": "章程",
+      "path": "docs/bylaw",
+      "names": [
+        "bylaw",
+        "章程"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification",
+      "names": [
+        "specification",
+        "规格",
+        "量潮知识工作规格"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/piece/artifact.md",
+      "names": [
+        "artifact",
+        "产物"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/piece/index.md",
+      "names": [
+        "index",
+        "工件"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/piece/material.md",
+      "names": [
+        "material",
+        "材料"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/place/index.md",
+      "names": [
+        "index",
+        "场所"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/place/workbench.md",
+      "names": [
+        "workbench",
+        "工作台"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/place/workspace.md",
+      "names": [
+        "workspace",
+        "工作区"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/process/index.md",
+      "names": [
+        "index",
+        "过程"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/process/task.md",
+      "names": [
+        "task",
+        "任务"
+      ]
+    },
+    {
+      "kind": "规格",
+      "path": "docs/specification/process/workflow.md",
+      "names": [
+        "workflow",
+        "工作流"
+      ]
+    },
+    {
+      "kind": "工具箱",
+      "path": "packages/quanttide-work-toolkit",
+      "names": [
+        "quanttide-work-toolkit",
+        "toolkit",
+        "工具箱"
+      ]
+    },
+    {
+      "kind": "工具箱",
+      "path": "packages/quanttide-work-toolkit/AGENTS.md",
+      "names": [
+        "AGENTS",
+        "AGENTS.md - quanttide-work-toolkit"
+      ]
+    },
+    {
+      "kind": "手册",
+      "path": "docs/handbook",
+      "names": [
+        "handbook",
+        "手册"
+      ]
+    },
+    {
+      "kind": "手册",
+      "path": "docs/handbook/artifacts/index.md",
+      "names": [
+        "index",
+        "产物规范"
+      ]
+    },
+    {
+      "kind": "手册",
+      "path": "docs/handbook/index.md",
+      "names": [
+        "index",
+        "知识工作手册"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery",
+      "names": [
+        "gallery",
+        "案例",
+        "画廊"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/context.md",
+      "names": [
+        "context",
+        "语境"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/gallery.md",
+      "names": [
+        "gallery",
+        "案例"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/handbook.md",
+      "names": [
+        "handbook",
+        "手册"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/index.md",
+      "names": [
+        "index",
+        "产物案例"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/insight.md",
+      "names": [
+        "insight",
+        "洞察"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/intention.md",
+      "names": [
+        "intention",
+        "意图"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/journal.md",
+      "names": [
+        "journal",
+        "日志"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/profile.md",
+      "names": [
+        "profile",
+        "档案"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/roadmap.md",
+      "names": [
+        "roadmap",
+        "路线图"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/artifacts/specification.md",
+      "names": [
+        "specification",
+        "规格"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/index.md",
+      "names": [
+        "index",
+        "知识工作画廊"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/workflows/from-intention-to-roadmap.md",
+      "names": [
+        "from-intention-to-roadmap",
+        "从意图到路线图"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/workflows/index.md",
+      "names": [
+        "index",
+        "流程案例"
+      ]
+    },
+    {
+      "kind": "案例",
+      "path": "docs/gallery/workspaces/domain-second-brain.md",
+      "names": [
+        "domain-second-brain",
+        "领域第二大脑"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud",
+      "names": [
+        "platform",
+        "qtcloud",
+        "平台",
+        "量潮云"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/devops-commit/SKILL.md",
+      "names": [
+        "Git 提交技能",
+        "SKILL"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/devops-release/SKILL.md",
+      "names": [
+        "SKILL",
+        "devops-release"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/devops-review/SKILL.md",
+      "names": [
+        "SKILL",
+        "devops-review"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/docs-deploy/SKILL.md",
+      "names": [
+        "SKILL",
+        "docs-deploy"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/docs-format/SKILL.md",
+      "names": [
+        "SKILL",
+        "文档格式技能"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/product-brd/SKILL.md",
+      "names": [
+        "SKILL",
+        "product-brd"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/product-drd/SKILL.md",
+      "names": [
+        "SKILL",
+        "product-drd"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/product-prd/SKILL.md",
+      "names": [
+        "SKILL",
+        "Skill: product-prd"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/.agents/skills/product-studio/SKILL.md",
+      "names": [
+        "SKILL",
+        "product-studio"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/AGENTS.md",
+      "names": [
+        "AGENTS",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/docs/dev-guide/studio.md",
+      "names": [
+        "Studio 原型 v3 设计",
+        "studio"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/src/provider/ROADMAP.md",
+      "names": [
+        "ROADMAP",
+        "ROADMAP — Provider"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/src/site/ROADMAP.md",
+      "names": [
+        "ROADMAP"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/src/studio/ROADMAP.md",
+      "names": [
+        "ROADMAP",
+        "ROADMAP — qtcloud_studio"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud/src/studio/TODO.md",
+      "names": [
+        "TODO",
+        "TODO — qtcloud_studio"
+      ]
+    },
+    {
+      "kind": "平台",
+      "path": "apps/qtcloud-work",
+      "names": [
+        "platform",
+        "qtcloud-work",
+        "云",
+        "平台"
+      ]
+    },
+    {
+      "kind": "教程",
+      "path": "docs/tutorial",
+      "names": [
+        "tutorial",
+        "教程",
+        "量潮示例文档项目"
+      ]
+    },
+    {
+      "kind": "教程",
+      "path": "docs/tutorial/index.md",
+      "names": [
+        "index",
+        "简介"
+      ]
+    },
+    {
+      "kind": "教程",
+      "path": "docs/tutorial/intro/workflow.md",
+      "names": [
+        "workflow",
+        "工作流程"
+      ]
+    },
+    {
+      "kind": "札记",
+      "path": "docs/essay",
+      "names": [
+        "essay",
+        "文集",
+        "札记"
+      ]
+    },
+    {
+      "kind": "实验室",
+      "path": "examples/default",
+      "names": [
+        "default",
+        "example",
+        "实验室"
+      ]
+    }
+  ]
+}
