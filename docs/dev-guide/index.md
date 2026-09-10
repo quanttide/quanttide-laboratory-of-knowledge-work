@@ -54,7 +54,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 **⑤ 图形入口** —— `kg gui` / `./kg-gui`：动作、参数、结果与命令行是同一套（`report.py` 出结果，命令行打印、界面画表），不重复算法。空输入先拦住、结果空表回退成文字、行里的文件双击就开、出错留在窗里。PySide6 的窗口模块可能被拆包，缺了会提示怎么补。
 
-**⑥ 对账与导出** —— `kg check --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg list --json`、`kg material --json` 同理，给别的程序读。
+**⑥ 审计与导出** —— `kg audit --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg list --json`、`kg material --json` 同理，给别的程序读。
 
 ## 待办
 

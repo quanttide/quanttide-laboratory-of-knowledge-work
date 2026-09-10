@@ -71,18 +71,18 @@ def list_payload(root: Path) -> dict:
     }
 
 
-def check(root: Path) -> Result:
+def audit(root: Path) -> Result:
     missing = assets_layer.missing(root)
     unregistered = catalog_layer.build(root).unregistered(root)
     ok = not (missing or unregistered)
     result = Result(ok=ok, columns=("问题", "说明"), rows=[("缺资产", f"{a.kind}（{a.name}）") for a in missing] + [("未登记", short(root, p)) for p in unregistered])
     result.lines = [f"{kind}：{what}" for kind, what in result.rows]
     if ok:
-        result.lines = ["对账通过：二十格齐备，无未登记目录。"]
+        result.lines = ["审计通过：二十格齐备，无未登记目录。"]
     return result
 
 
-def check_payload(root: Path) -> dict:
+def audit_payload(root: Path) -> dict:
     missing = assets_layer.missing(root)
     unregistered = catalog_layer.build(root).unregistered(root)
     return {

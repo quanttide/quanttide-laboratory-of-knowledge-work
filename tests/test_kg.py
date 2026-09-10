@@ -67,8 +67,8 @@ def gui_smoke(real: Path) -> None:
     window = gui.Window(real)
     window.list.setCurrentRow(1)  # 全库
     test("界面：全库出得了表", bool(window.run_current().rows))
-    window.list.setCurrentRow(2)  # 对账
-    test("界面：对账通过", window.run_current().ok)
+    window.list.setCurrentRow(2)  # 审计
+    test("界面：审计通过", window.run_current().ok)
     window.list.setCurrentRow(6)  # 核对契约
     window.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
     audit = window.run_current()
@@ -138,9 +138,9 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         root = fake_repo(Path(tmp) / "cli")
         out = Path(tmp) / "报告.json"
-        code = cli.main(["--root", str(root), "check", "--json", str(out)])
+        code = cli.main(["--root", str(root), "audit", "--json", str(out)])
         report = json.loads(out.read_text(encoding="utf-8"))
-        test("命令行：对账齐备返回零", code == 0 and report["result"] == "通过", f"exit={code}")
+        test("命令行：审计齐备返回零", code == 0 and report["result"] == "通过", f"exit={code}")
         code = cli.main(["--root", str(root), "find", "不存在的名字"])
         test("命令行：找不到返回非零", code == 1, f"exit={code}")
 

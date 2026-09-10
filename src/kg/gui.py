@@ -57,7 +57,7 @@ class Spec:
 SPECS = (
     Spec("找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, v["名字"], v["看正文"])),
     Spec("全库", "列出全部条目", (), lambda root, v: report.list_all(root), "目录.json", lambda root, v: report.list_payload(root)),
-    Spec("对账", "契约有而仓库无、仓库有而契约无", (), lambda root, v: report.check(root), "对账.json", lambda root, v: report.check_payload(root)),
+    Spec("审计", "契约有而工作区无、工作区有而契约无", (), lambda root, v: report.audit(root), "审计.json", lambda root, v: report.audit_payload(root)),
     Spec("看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
     Spec("写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.CONTRACT_TEMPLATE)),
     Spec("写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.DOSSIER_TEMPLATE)),
@@ -166,7 +166,7 @@ class Window(QMainWindow):
         self.hint_label.setText(self.spec.hint)
         self.show_result(report.Result(lines=[f"{self.spec.name}：{self.spec.hint}"]))
         self.statusBar().showMessage(self.spec.hint)
-        if not self.spec.fields:  # 没有参数的动作（全库、对账）选中就直接出结果
+        if not self.spec.fields:  # 没有参数的动作（全库、审计）选中就直接出结果
             self.run_current()
 
     def _with_browse(self, field: str) -> QWidget:

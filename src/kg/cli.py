@@ -2,7 +2,7 @@
 
   kg find <名字> [--show]        按名找文档——认文件名与中文标题
   kg list [--json 文件]          看全库 / 导出目录
-  kg check [--json 文件]         对账——契约有而仓库无、仓库有而契约无
+  kg audit [--json 文件]         审计——契约有而工作区无、工作区有而契约无
   kg material [路径…] [--json]   看材料——类型、内容、来源、时间、阶段
   kg new-contract <文件>         写契约骨架（目标 / 输出形态 / 必须包含 / 检查项）
   kg new-dossier <文件>          写案卷骨架（产出 / 审查 / 裁决 / 成果）
@@ -42,10 +42,10 @@ def cmd_list(root: Path, args) -> int:
     return emit(result)
 
 
-def cmd_check(root: Path, args) -> int:
+def cmd_audit(root: Path, args) -> int:
     if args.json:
-        catalog_layer.write_json(Path(args.json), report.check_payload(root))
-    return emit(report.check(root))
+        catalog_layer.write_json(Path(args.json), report.audit_payload(root))
+    return emit(report.audit(root))
 
 
 def cmd_material(root: Path, args) -> int:
@@ -98,8 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     listing = sub.add_parser("list", help="列全库")
     listing.add_argument("--json", metavar="文件")
 
-    check = sub.add_parser("check", help="对账")
-    check.add_argument("--json", metavar="文件")
+    audit = sub.add_parser("audit", help="审计工作区")
+    audit.add_argument("--json", metavar="文件")
 
     material = sub.add_parser("material", help="看材料")
     material.add_argument("paths", nargs="*", metavar="路径")
@@ -116,7 +116,7 @@ def build_parser() -> argparse.ArgumentParser:
 HANDLERS = {
     "find": cmd_find,
     "list": cmd_list,
-    "check": cmd_check,
+    "audit": cmd_audit,
     "material": cmd_material,
     "new-contract": cmd_new_contract,
     "new-dossier": cmd_new_dossier,
