@@ -1,4 +1,4 @@
-"""契约层：资产应该有什么、叫什么、落在哪。
+"""契约层：第二大脑应该有什么、叫什么、落在哪。
 
 依据量潮第二大脑章程第九条（程序型）与第十三条（陈述型）、第二条（不占格）；
 资产的中文用名是本领域的命名决定，改动即改规范。
@@ -40,16 +40,6 @@ LOCATION = {  # 非同名目录的三格，按命名规则找独立仓库
 }
 
 
-def repo_root(start: Path | None = None) -> Path:
-    """仓库根：从当前文件往上找，直到看见数据层。"""
-    d = (start or Path(__file__)).resolve().parent
-    while not (d / "data" / "journal").is_dir():
-        if d == d.parent:
-            raise FileNotFoundError("未找到第二大脑仓库根")
-        d = d.parent
-    return d
-
-
 @dataclass(frozen=True)
 class Asset:
     kind: str  # 中文用名
@@ -71,3 +61,12 @@ def locate(root: Path, asset: Asset) -> list[Path]:
 def missing(root: Path) -> list[Asset]:
     """契约有而目录无的格子。"""
     return [asset for asset in assets() if not locate(root, asset)]
+
+
+def repo_root(start: Path | None = None) -> Path:
+    """工作区根：从起点往上找，直到看见数据层。"""
+    d = (start or Path.cwd()).resolve()
+    for candidate in (d, *d.parents):
+        if (candidate / "data" / "journal").is_dir():
+            return candidate
+    raise FileNotFoundError("未找到第二大脑仓库根（应在含 data/journal 的目录下使用）")

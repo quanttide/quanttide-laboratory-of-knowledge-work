@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quanttide-work-kg"
+version = "0.1.0"
+description = "量潮知识工作工具箱：找得到（索引）、看得见（记录）、核得动（判据）"
+requires-python = ">=3.10"
+
+[project.scripts]
+kg = "kg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,4 +1,4 @@
-"""目录层：按契约清点仓库里实际有什么，建成名字索引。
+"""目录层：按契约清点工作区里实际有什么，建成名字索引。
 
 目录是快照——仓库变了要重扫；名字索引同时收文件名与篇内标题，
 因为命名规则规定英文文件名与中文标题不互译。
@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import contract
+from . import assets as assets_layer
 
 CONTAINERS = ("data", "docs", "packages", "apps", "examples")  # 资产都挂在这五处之下
 SKIP = {".git", "node_modules", ".venv", "build", "dist", ".dart_tool", "__pycache__"}
@@ -32,11 +32,23 @@ class Catalog:
 
     def find(self, query: str) -> list[Entry]:
         q = query.strip().rstrip("/").lower()
-        hits = lambda e: {n.lower() for n in e.names}
+        hits = lambda e: {n.lower() for n in e.names}  # noqa: E731
         exact = [e for e in self.entries if q in hits(e)]
         if exact:
             return exact
         return [e for e in self.entries if any(q in n or n in q for n in hits(e))]
+
+    def unregistered(self, root: Path) -> list[Path]:
+        """目录有而契约无：未登记在资产表里的顶层目录。"""
+        known = {path for asset in assets_layer.assets() for path in assets_layer.locate(root, asset)}
+        found = [
+            child
+            for name in CONTAINERS
+            if (parent := root / name).is_dir()
+            for child in parent.iterdir()
+            if child.is_dir() and not child.name.startswith(".")
+        ]
+        return sorted(p for p in found if p not in known)
 
     def dump(self, root: Path, target: Path) -> None:
         """目录的自带格式：JSON——每条含种类、路径与全部名字。"""
@@ -52,20 +64,12 @@ class Catalog:
                 for entry in self.entries
             ],
         }
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        write_json(target, payload)
 
-    def unregistered(self, root: Path) -> list[Path]:
-        """目录有而契约无：未登记在资产表里的顶层目录。"""
-        known = {path for asset in contract.assets() for path in contract.locate(root, asset)}
-        found = [
-            child
-            for name in CONTAINERS
-            if (parent := root / name).is_dir()
-            for child in parent.iterdir()
-            if child.is_dir() and not child.name.startswith(".")
-        ]
-        return sorted(p for p in found if p not in known)
+
+def write_json(target: Path, payload: dict) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def title_of(path: Path) -> str | None:
@@ -83,8 +87,8 @@ def cn_name(path: Path) -> str | None:
         return None
     for line in readme.read_text(encoding="utf-8").splitlines():
         for pattern in (r"^# (量潮.+)$", r"量潮知识工作(.{1,8})——"):
-            if m := re.match(pattern, line):
-                return m.group(1).strip()
+            if match := re.match(pattern, line):
+                return match.group(1).strip()
     return None
 
 
@@ -98,8 +102,8 @@ def documents(path: Path):
 
 def build(root: Path) -> Catalog:
     catalog = Catalog()
-    for asset in contract.assets():
-        for path in contract.locate(root, asset):
+    for asset in assets_layer.assets():
+        for path in assets_layer.locate(root, asset):
             names = {asset.kind, asset.name, path.name}
             if alias := cn_name(path):
                 names.add(alias)
