@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""图形入口：本目录下直接 ./kg-gui，不必安装；实际就是 kg gui。"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from kg.cli import main  # noqa: E402
+
+if __name__ == "__main__":
+    raise SystemExit(main(["gui", *sys.argv[1:]]))

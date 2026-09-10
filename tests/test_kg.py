@@ -7,11 +7,13 @@
 """
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+LAB = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(LAB / "src"))
 
 from kg import assets as assets_layer  # noqa: E402
 from kg import catalog as catalog_layer  # noqa: E402
@@ -49,6 +51,32 @@ def with_repo(root: Path) -> None:
     for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.email=lab@example.com", "-c", "user.name=lab", "commit", "-qm", "首次提交"]):
         subprocess.run(["git", *cmd], cwd=root, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-q", "--amend", "--date=2026-09-10T09:00:00", "--no-edit"], cwd=root, check=True, capture_output=True)
+
+
+def gui_smoke(real: Path) -> None:
+    """界面冒烟：装了 PySide6 的窗口模块就跑，没装就跳过（不影响其它项）。"""
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+
+        from kg import gui
+    except ImportError:
+        print("（未装 PySide6 窗口模块，跳过界面冒烟：pip install PySide6-Essentials）")
+        return
+    app = QApplication.instance() or QApplication([])
+    window = gui.Window(real)
+    window.list.setCurrentRow(1)  # 全库
+    test("界面：全库出得了表", bool(window.run_current().rows))
+    window.list.setCurrentRow(2)  # 对账
+    test("界面：对账通过", window.run_current().ok)
+    window.list.setCurrentRow(6)  # 核对契约
+    window.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
+    audit = window.run_current()
+    test("界面：核对真实契约", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
+    window.list.setCurrentRow(0)  # 找文档：空输入先拦
+    test("界面：空输入先拦住", not window.run_current().ok)
+    window.close()
+    del app
 
 
 def main() -> int:
@@ -115,6 +143,8 @@ def main() -> int:
         test("命令行：对账齐备返回零", code == 0 and report["result"] == "通过", f"exit={code}")
         code = cli.main(["--root", str(root), "find", "不存在的名字"])
         test("命令行：找不到返回非零", code == 1, f"exit={code}")
+
+    gui_smoke(real)
 
     for name, ok, detail in RESULTS:
         print(f"{'✓' if ok else '✗'} {name}" + (f"——{detail}" if detail and not ok else ""))

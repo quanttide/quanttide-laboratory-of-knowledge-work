@@ -6,7 +6,9 @@
 
 ```text
 src/kg/
-├── cli.py       入口：八个动作（argparse，kg --help 即用法）
+├── cli.py       命令行入口：八个动作 + gui（argparse，kg --help 即用法）
+├── gui.py       窗口入口：同一套动作，左栏动作、右栏参数、下边结果
+├── report.py    动作结果：命令行与窗口共用的一层
 ├── assets.py    契约层：二十格、落点规则、工作区根
 ├── catalog.py   目录层：扫描成名字索引（收文件名与篇内标题）
 ├── checks.py    判据：解析契约里的机械核对并执行
@@ -14,10 +16,10 @@ src/kg/
 ├── records.py   两种记录：契约四段、案卷四段与骨架
 └── __main__.py  python3 -m kg
 
-tests/test_kg.py       自带测试，17 项，不依赖 pytest
+tests/test_kg.py       自带测试，17 项（装 PySide6 窗口模块则多 4 项界面冒烟），不依赖 pytest
 samples/               真实契约与真实案卷（判例，也是格式自证）
-kg                     本目录下的启动器（不必安装）
-pyproject.toml         打包：装上就是 kg 命令
+kg / kg-gui            本目录下的启动器（不必安装）
+pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```
 
 代码在 `src/kg/`，说明在 `docs/`：`docs/user-guide/` 对外讲怎么用，`docs/index.md` 讲两种工作模式与三种记录，本文件讲怎么继续开发。
@@ -50,11 +52,13 @@ pyproject.toml         打包：装上就是 kg 命令
 
 **④ 测试与打包** —— `python3 tests/test_kg.py` 17 项全通过（真工作区当集成夹具、临时目录当单元夹具）；`pyproject.toml` 一装就是 `kg` 命令，本目录下 `./kg` 也能跑。
 
-**⑤ 对账与导出** —— `kg check --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg list --json`、`kg material --json` 同理，给别的程序读。
+**⑤ 图形入口** —— `kg gui` / `./kg-gui`：动作、参数、结果与命令行是同一套（`report.py` 出结果，命令行打印、界面画表），不重复算法。空输入先拦住、结果空表回退成文字、行里的文件双击就开、出错留在窗里。PySide6 的窗口模块可能被拆包，缺了会提示怎么补。
+
+**⑥ 对账与导出** —— `kg check --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg list --json`、`kg material --json` 同理，给别的程序读。
 
 ## 待办
 
-**⑥ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：八个动作在真实工作区上稳定跑通；测试守着；契约与案卷的格式被真实交付用过至少一次（已有一件，够不够看后续）。
+**⑦ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：九个动作在真实工作区上稳定跑通；测试守着；契约与案卷的格式被真实交付用过至少一次（已有一件，够不够看后续）。
 
 ## 已决：曾经的重复
 

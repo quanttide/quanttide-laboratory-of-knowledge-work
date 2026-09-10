@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 
 [project.scripts]
 kg = "kg.cli:main"
+kg-gui = "kg.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
