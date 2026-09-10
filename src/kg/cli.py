@@ -12,6 +12,8 @@
   kg workflow --list             有哪些工作流、各自的步骤
   kg workflow --new <名字> --steps 甲,乙,丙 [--note 一句话]   写一条工作流
   kg workflow <名字>             看这条工作流的步骤与判据
+  kg workflow <名字> --export <文件>   把这条工作流存成一份可带走的文件
+  kg workflow --import <文件> [--as 名字]   把一份工作流文件导进来用
 
 任务（工作流的一次执行实例）
   kg task --list                 有哪些任务、跑哪条工作流、下一步
@@ -76,8 +78,12 @@ def cmd_workflow(root: Path, args) -> int:
     if args.new:
         steps = [item.strip() for item in args.steps.split(",") if item.strip()]
         return emit(report.workflow_new(data, args.name or "", steps, args.note))
+    if args.import_from:
+        return emit(report.workflow_import(data, Path(args.import_from), args.as_name))
     if not args.name:
-        return emit(report.Result(ok=False, lines=["用法：kg workflow <名字>，或 kg workflow --list / --new <名字> --steps 甲,乙"]))
+        return emit(report.Result(ok=False, lines=["用法：kg workflow <名字>，或 --list / --new / --import"]))
+    if args.export:
+        return emit(report.workflow_export(data, args.name, Path(args.export)))
     return emit(report.workflow_show(data, args.name))
 
 
@@ -138,6 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
     flow.add_argument("--new", action="store_true", help="写一条工作流")
     flow.add_argument("--steps", default="", metavar="甲,乙,丙")
     flow.add_argument("--note", default="", metavar="一句话", help="这条工作流是干什么的")
+    flow.add_argument("--export", metavar="文件", help="存成一份可带走的文件")
+    flow.add_argument("--import", dest="import_from", metavar="文件", help="导进来一份工作流文件")
+    flow.add_argument("--as", dest="as_name", default="", metavar="名字", help="导入时另起名字")
 
     task = sub.add_parser("task", help="任务：工作流的一次执行实例")
     task.add_argument("name", nargs="?", metavar="名字")

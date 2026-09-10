@@ -192,6 +192,26 @@ def flow_and_task(real: Path) -> None:
         test("数据分三家放", task.file.is_relative_to(data / "tasks") and flow.file.is_relative_to(data / "workflows") and task.artifacts_dir.is_relative_to(data / "artifacts"))
 
 
+def carry(real: Path) -> None:
+    """工作流存下来，下次能导入用：导出 → 导进另一个数据仓，内容一字不差。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp) / "data-a"
+        away = Path(tmp) / "data-b"
+        report.workflow_new(home, "带走的流程", ["步", "做"], "试一份可带走的工作流")
+        source = report.workflow_export(home, "带走的流程", Path(tmp) / "带走的流程.md")
+        test("导出：文件落地", source.ok and (Path(tmp) / "带走的流程.md").is_file())
+
+        here = flow_layer.open_workflow(home, "带走的流程")
+        before = [(s.name, s.executor, s.judges) for s in here.steps()]
+        imported = report.workflow_import(away, Path(tmp) / "带走的流程.md")
+        there = flow_layer.open_workflow(away, "带走的流程")
+        test("导入：落进另一个数据仓", imported.ok and there.file.is_file() and there.file.is_relative_to(away))
+        test("导入：步骤、执行者、判据一字不差", before == [(s.name, s.executor, s.judges) for s in there.steps()], str(before))
+        test("导入：重名挡住", not report.workflow_import(away, Path(tmp) / "带走的流程.md").ok)
+        test("导入：换名字放行", report.workflow_import(away, Path(tmp) / "带走的流程.md", "带走的流程·二").ok)
+        test("导入：不是工作流的文件挡住", not report.workflow_import(away, LAB / "README.md").ok)
+
+
 def links(real: Path) -> None:
     """编号与补建。"""
     with tempfile.TemporaryDirectory() as tmp:
@@ -249,6 +269,7 @@ def main() -> int:
     workspace(real)
     judges(real)
     flow_and_task(real)
+    carry(real)
     links(real)
     gui_smoke(real)
 

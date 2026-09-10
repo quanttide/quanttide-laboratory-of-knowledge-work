@@ -373,6 +373,9 @@ class Desk(QWidget):
         workflow_button = QPushButton("看工作流")
         workflow_button.clicked.connect(self._open_workflow)
         row.addWidget(workflow_button)
+        export_button = QPushButton("导出工作流…")
+        export_button.clicked.connect(self._export_workflow)
+        row.addWidget(export_button)
         history_button = QPushButton("写历史…")
         history_button.clicked.connect(self.write_history)
         row.addWidget(history_button)
@@ -471,6 +474,14 @@ class Desk(QWidget):
         if ok and words.strip():
             report.task_history(self.root, self.data, self.task.name, words.strip())
             self.reload()
+
+    def _export_workflow(self) -> None:
+        if self.task is None:
+            return
+        flow = self.task.workflow()
+        path, _ = QFileDialog.getSaveFileName(self, "存到哪", str(self.root / f"{flow.name}.md"), "Markdown (*.md)")
+        if path:
+            self.window().statusBar().showMessage(f"已导出：{report.workflow_export(self.data, flow.name, Path(path)).lines[0]}")
 
     def _open_workflow(self) -> None:
         if self.task is None:

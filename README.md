@@ -24,6 +24,7 @@ uv venv .venv && uv pip install -e ".[gui]"
 |------|--------|
 | `kg workflow --new <名字> --steps 甲,乙,丙` | 写一条工作流：步骤串联，每步自带验收判据 |
 | `kg workflow <名字>` / `--list` | 看步骤与判据 / 有哪些工作流 |
+| `kg workflow <名字> --export <文件>` / `--import <文件> [--as 名字]` | 存成一份可带走的文件 / 导进来用（验步骤、重名挡） |
 | `kg task --new <名字> --workflow <工作流> [--about …]` | 起一件任务（工作流的一次执行） |
 | `kg task <名字>` / `--list` | 看步骤状态与流水 / 有哪些任务 |
 | `kg task <名字> --next` | 走下一步：执行者是 AI 的交给 `pi -p` 跑，然后**程序自己**核对判据、记账 |

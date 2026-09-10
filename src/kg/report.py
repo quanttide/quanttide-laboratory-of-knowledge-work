@@ -166,6 +166,28 @@ def workflow_show(data: Path, name: str) -> Result:
     return result
 
 
+def workflow_export(data: Path, name: str, target: Path) -> Result:
+    flow = flow_layer.open_workflow(data, name)
+    if not flow.exists():
+        return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
+    saved = flow_layer.export(flow, target)
+    result = workflow_show(data, name)
+    result.lines.insert(0, f"已导出：{saved}（步骤 {len(flow.steps())} 个，原样带走）")
+    return result
+
+
+def workflow_import(data: Path, source: Path, name: str = "") -> Result:
+    if not Path(source).is_file():
+        return Result(ok=False, lines=[f"没有这份文件：{source}"])
+    try:
+        flow = flow_layer.import_workflow(data, source, name)
+    except (ValueError, FileExistsError) as error:
+        return Result(ok=False, lines=[str(error)])
+    result = workflow_show(data, flow.name)
+    result.lines.insert(0, f"已导入：{flow.source if hasattr(flow, 'source') else short(data, flow.file)}（步骤 {len(flow.steps())} 个）")
+    return result
+
+
 def workflow_list(data: Path) -> Result:
     found = flow_layer.listing(data)
     result = Result(columns=("工作流", "步骤", "位置"), lines=[])

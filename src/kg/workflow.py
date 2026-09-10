@@ -118,6 +118,36 @@ def open_workflow(data: Path, name: str) -> Workflow:
     return Workflow(Path(data), name)
 
 
+TITLE = re.compile(r"^#\s*工作流[：:]\s*(.*)$", re.M)
+
+
+def export(flow: Workflow, target: Path) -> Path:
+    """把一条工作流存成一份可带走的文件（原样，不改内容）。"""
+    target = Path(target)
+    if target.is_dir():
+        target = target / flow.file.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(flow.text(), encoding="utf-8")
+    return target
+
+
+def import_workflow(data: Path, source: Path, name: str = "") -> Workflow:
+    """把一份工作流文件导进来：验一下有步骤，起个名字，落到 workflows/。"""
+    source = Path(source)
+    text = source.read_text(encoding="utf-8")
+    if not any(STEP.match(line) for line in text.splitlines()):
+        raise ValueError(f"{source.name} 里没有步骤（应以「### 步骤名」列出），不像一份工作流")
+    found = TITLE.search(text)
+    chosen = (name or (found.group(1).strip() if found else "") or source.stem).strip()
+    flow = Workflow(Path(data), chosen)
+    if flow.exists():
+        raise FileExistsError(f"已经有一条工作流叫「{chosen}」：{flow.file}（换名字用 --as）")
+    flow.file.parent.mkdir(parents=True, exist_ok=True)
+    text = TITLE.sub(f"# 工作流：{chosen}", text, count=1) if found else f"# 工作流：{chosen}\n\n{text}"
+    flow.file.write_text(text, encoding="utf-8")
+    return flow
+
+
 def listing(data: Path) -> list[Workflow]:
     base = Path(data) / "workflows"
     return [Workflow(Path(data), path.stem) for path in sorted(base.glob("*.md"))] if base.is_dir() else []
