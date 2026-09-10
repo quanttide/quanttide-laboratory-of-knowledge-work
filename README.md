@@ -27,20 +27,20 @@ uv venv .venv && uv pip install -e ".[gui]"
 | `kg task <名字> --material/--contract/--review/--output/--decision/--finish/--history` | 往前走一步，事实自动记进流水 |
 | `kg find <名字>` | 按名找文档——认文件名与中文标题 |
 | `kg catalog` | 看目录——列全部条目，可导 JSON |
-| `kg audit [--make]` | 审计——契约有而工作区无、工作区有而契约无；`--make` 补建缺的格子 |
+| `kg audit [--make]` | 审计——资产表有而工作区无、工作区有而资产表无；`--make` 补建缺的格子 |
 | `kg material [路径…]` | 看材料——类型、内容、来源、时间，阶段由位置承担 |
-| `kg new-contract [--about 路径]` / `kg new-dossier` | 写契约骨架（`--about` 以某件东西为题）/ 写案卷骨架 |
-| `kg audit-contract [--into 案卷]` / `kg audit-dossier` | 核对契约（`--into` 把审查者报告写进案卷）/ 核对案卷 |
+| `kg new-instruction [--about 目标]` / `kg audit-instruction [--into 报告]` | 写指令骨架（目标 / 步骤 / 验收）/ 核对指令：跑验收里的判据，可把审查者报告写进报告 |
+| `kg new-report` / `kg audit-report` | 写报告骨架（事件四段）/ 核对报告 |
 | `kg gui` | 开窗口——台面（当前这个任务）与浏览（工作区动作）两页 |
 
 默认工作区从当前目录往上找，`--root` 可指向别的第二大脑。
 
 ## 目录
 
-- `src/kg/` 程序：assets（契约层）、catalog（目录层）、checks（判据）、material（材料）、records（记录的段位与骨架）、task（任务：状态机、动作、流水）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`tasks/` 任务在飞的、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实契约与真实报告
+- `src/kg/` 程序：assets（资产层：二十格与落点）、catalog（目录层）、checks（判据）、material（材料）、records（记录段位与骨架：任务三段、报告四段、历史）、task（任务：状态机、动作、流水）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`tasks/` 任务在飞的、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实指令与真实报告
 - `tests/` 自带测试：`python3 tests/test_kg.py`，26 项；装了 PySide6 窗口模块则多 6 项界面冒烟，不依赖 pytest
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`tasks/` 任务在飞的、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实契约与真实报告
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`tasks/` 任务在飞的、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实指令与真实报告
 - `docs/` 说明：模式与记录（index.md）、用户指南、开发计划
 
 ## 许可

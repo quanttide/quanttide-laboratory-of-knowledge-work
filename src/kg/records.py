@@ -7,32 +7,10 @@
 
 from pathlib import Path
 
-CONTRACT_SECTIONS = ("目标", "输出形态", "必须包含", "检查项")
 REPORT_SECTIONS = ("生成者产出", "审查者报告", "人类裁决", "最终成果")
 TASK_SECTIONS = ("目标", "步骤", "验收")
+CHECK_SECTION = "验收"  # 判据（机械 / 闸门）住在这儿
 HISTORY_PLACEHOLDER = "（这个任务的来龙去脉，你写）"
-
-CONTRACT_TEMPLATE = """# 契约：<一句话说清要什么>
-
-## 目标
-
-<要什么>
-
-## 输出形态
-
-<交付物的形态：文件、路径、范围>
-
-## 必须包含
-
-- <要素一>
-- <要素二>
-
-## 检查项
-
-- [ ] 机械：目标侧文件已就位 `path:data/journal/README.md`
-- [ ] 机械：旧位置的副本已删除 `absent:data/journal/old.md`
-- [ ] 闸门：落点与源位置同构
-"""
 
 REPORT_TEMPLATE = """# 报告：{title}
 
@@ -51,12 +29,6 @@ HISTORY_TEMPLATE = """# 历史：{title}
 """
 
 
-def contract_template(about: str = "") -> str:
-    """以某件已有的东西为题立契约：目标里点名，必须包含里写下来源。"""
-    if not about:
-        return CONTRACT_TEMPLATE
-    text = CONTRACT_TEMPLATE.replace("<要什么>", f"改 `{about}`：<要什么>")
-    return text.replace("- <要素一>", f"- 来源：`{about}`")
 
 
 TASK_TEMPLATE = """# 任务：{title}
@@ -77,7 +49,7 @@ TASK_TEMPLATE = """# 任务：{title}
 
 
 def task_template(title: str = "", goal: str = "<要什么，一句话>") -> str:
-    """任务的指令：按手册的三段——目标 / 步骤 / 验收。"""
+    """任务的指令：按手册的三段——目标 / 步骤 / 验收；判据（机械/闸门）住在验收里。"""
     return TASK_TEMPLATE.format(title=title or "<任务的名字>", goal=goal or "<要什么，一句话>")
 
 

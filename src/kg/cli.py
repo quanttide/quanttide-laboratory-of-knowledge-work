@@ -8,9 +8,9 @@
   kg find <名字> [--show]        按名找文档——认文件名与中文标题
   kg material [路径…] [--json]   看材料——类型、内容、来源、时间、阶段
 
-契约
-  kg new-contract <文件> [--about 路径]   写契约骨架；--about 以某件东西为题
-  kg audit-contract <文件> [--into 报告]  核对契约；--into 把审查者报告写进报告
+指令
+  kg new-instruction <文件> [--about 目标]  写指令骨架（目标 / 步骤 / 验收）
+  kg audit-instruction <文件> [--into 报告] 核对指令；--into 把审查者报告写进报告
 
 报告（事件）
   kg new-report <文件> [--about 标题]     写报告骨架（事件）
@@ -21,7 +21,7 @@
   kg task --new <名字>           起任务
   kg task <名字>                 看这个任务的七格状态与流水
   kg task <名字> --material <路径>   记一条材料（类型 / 阶段 / 时间 / 来源现填）
-  kg task <名字> --contract       以记下的材料立契约
+  kg task <名字> --instruction    写出指令骨架（目标 / 步骤 / 验收）
   kg task <名字> --review         跑机械核对，审查者报告写进报告
   kg task <名字> --output <路径>     记一笔产出
   kg task <名字> --decision <话>     写下裁决
@@ -79,16 +79,16 @@ def cmd_material(root: Path, args) -> int:
     return emit(report.material(root, args.paths))
 
 
-def cmd_new_contract(root: Path, args) -> int:
-    return emit(report.new_contract(Path(args.target), args.about))
+def cmd_new_instruction(root: Path, args) -> int:
+    return emit(report.new_instruction(Path(args.target), args.about))
 
 
 def cmd_new_report(root: Path, args) -> int:
     return emit(report.new_report(Path(args.target), args.about))
 
 
-def cmd_audit_contract(root: Path, args) -> int:
-    return emit(report.audit_contract(root, Path(args.target), Path(args.into) if args.into else None))
+def cmd_audit_instruction(root: Path, args) -> int:
+    return emit(report.audit_instruction(root, Path(args.target), Path(args.into) if args.into else None))
 
 
 def cmd_task(root: Path, args) -> int:
@@ -99,7 +99,7 @@ def cmd_task(root: Path, args) -> int:
         return emit(report.task_new(root, args.name or "", data, args.tasks, args.about))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg task <名字>，或 kg task --list / --new <名字>"]))
-    for action in ("material", "contract", "review", "output", "decision", "finish", "history"):
+    for action in ("material", "instruction", "review", "output", "decision", "finish", "history"):
         if getattr(args, action):
             value = value_of(args, action)
             return emit(report.task_step(root, args.name, action, value, data, args.tasks))
@@ -111,7 +111,7 @@ def value_of(args, action: str) -> str:
     given = getattr(args, action)
     if action in ("material", "output"):
         return given if isinstance(given, str) else ""
-    if action in ("decision", "history"):
+    if action in ("decision", "history", "instruction"):
         return given if isinstance(given, str) else ""
     return ""
 
@@ -154,13 +154,13 @@ def build_parser() -> argparse.ArgumentParser:
     material.add_argument("paths", nargs="*", metavar="路径")
     material.add_argument("--json", metavar="文件")
 
-    contract = sub.add_parser("new-contract", help="写契约骨架")
-    contract.add_argument("target", metavar="文件")
-    contract.add_argument("--about", default="", metavar="路径", help="以某件已有的东西为题")
+    instruction = sub.add_parser("new-instruction", help="写指令骨架")
+    instruction.add_argument("target", metavar="文件")
+    instruction.add_argument("--about", default="", metavar="目标", help="目标一句话")
     dossier = sub.add_parser("new-report", help="写报告骨架")
     dossier.add_argument("target", metavar="文件")
     dossier.add_argument("--about", default="", metavar="标题")
-    checking = sub.add_parser("audit-contract", help="核对契约")
+    checking = sub.add_parser("audit-instruction", help="核对指令")
     checking.add_argument("target", metavar="文件")
     checking.add_argument("--into", metavar="报告", help="把审查者报告写进这份报告")
     sub.add_parser("audit-report", help="核对报告").add_argument("target", metavar="文件")
@@ -171,7 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
     task.add_argument("--about", default="", metavar="一句话", help="开工时的一句话，或立契约时以哪件东西为题")
     task.add_argument("--tasks", metavar="目录", help="任务放哪（默认 <数据仓>/tasks）")
     task.add_argument("--material", nargs="?", const=True, metavar="路径")
-    task.add_argument("--contract", nargs="?", const=True, metavar="以它为题的路径")
+    task.add_argument("--instruction", nargs="?", const=True, metavar="目标一句话")
     task.add_argument("--review", action="store_true")
     task.add_argument("--output", nargs="?", const=True, metavar="路径")
     task.add_argument("--decision", nargs="?", const=True, metavar="一句话")
@@ -186,9 +186,9 @@ HANDLERS = {
     "catalog": cmd_catalog,
     "audit": cmd_audit,
     "material": cmd_material,
-    "new-contract": cmd_new_contract,
+    "new-instruction": cmd_new_instruction,
     "new-report": cmd_new_report,
-    "audit-contract": cmd_audit_contract,
+    "audit-instruction": cmd_audit_instruction,
     "audit-report": cmd_audit_report,
     "task": cmd_task,
     "gui": cmd_gui,

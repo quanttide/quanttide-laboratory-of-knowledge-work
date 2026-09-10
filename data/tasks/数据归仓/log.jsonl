@@ -1,1 +1,8 @@
 {"at": "2026-09-10 21:04", "kind": "开工", "detail": "所有数据放实验室 data/，禁止过滤", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "核对", "detail": "机械核对 3 项", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "产出", "detail": "examples/default/AGENTS.md", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "裁决", "detail": "创始人：数据全部放实验室 data/，禁止过滤。", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "成果", "detail": "1 项", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "历史", "detail": "先有报告/历史的归位，再有数据只在本仓的纪律；程序默认写 data/，扫描只豁免", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "材料", "detail": "AGENTS.md", "ok": true}
+{"at": "2026-09-10 21:06", "kind": "材料", "detail": "data/journal/iGuo/2026-09-10.md", "ok": true}

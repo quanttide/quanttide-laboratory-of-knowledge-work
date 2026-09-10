@@ -21,10 +21,9 @@ from pathlib import Path
 
 from . import records
 
-STAGES = ("材料", "契约", "核对", "产出", "裁决", "成果", "历史")
+STAGES = ("材料", "指令", "核对", "产出", "裁决", "成果", "历史")
 TASK_FILE = "task.md"
 MATERIALS = "materials.md"
-CONTRACT = "contract.md"
 LOG = "log.jsonl"
 REPORT = "report"
 HISTORY = "history"
@@ -73,6 +72,10 @@ class Task:
         """Markdown 列表里的条目。"""
         return [line.strip()[2:].strip() for line in self.text(name).splitlines() if line.strip().startswith("- ")]
 
+    def instruction(self) -> dict[str, list[str]]:
+        """任务的指令：目标 / 步骤 / 验收（判据住在验收里）。"""
+        return records.read_sections(self.file(TASK_FILE))
+
     def report(self) -> dict[str, list[str]]:
         path = self.record_file(REPORT)
         return records.read_sections(path) if path.is_file() else {}
@@ -83,10 +86,11 @@ class Task:
     def stages(self) -> dict[str, bool]:
         """七格状态：材料、契约、核对、产出、裁决、成果、历史。"""
         report = self.report()
+        instruction = self.instruction()
         history = self.record_file(HISTORY)
         return {
             "材料": bool(self.items(MATERIALS)),
-            "契约": "## 目标" in self.text(CONTRACT),
+            "指令": bool(instruction.get("步骤")) and bool(instruction.get("验收")),
             "核对": bool(report.get("审查者报告")),
             "产出": bool(report.get("生成者产出")),
             "裁决": bool(report.get("人类裁决")),
@@ -99,7 +103,7 @@ class Task:
         state = self.stages()
         for action, hint in (
             ("材料", "记一条材料（还没做成成品的输入）"),
-            ("契约", "以记下的材料立契约"),
+            ("指令", "写指令：目标 / 步骤 / 验收（判据写在验收里）"),
             ("核对", "跑契约的机械核对，结果写进报告"),
             ("产出", "按契约做出来，记一笔产出"),
             ("裁决", "谁拍板、决定是什么"),
@@ -176,18 +180,19 @@ def add_material(task: Task, rel: str, fields: str) -> None:
     task.record("材料", rel)
 
 
-def write_contract(task: Task, about: str) -> None:
-    task.write(CONTRACT, records.contract_template(about))
-    task.record("契约", f"以 {about} 为题" if about else "写契约")
+def write_instruction(task: Task, goal: str) -> None:
+    """写出指令骨架：目标填上，步骤与验收留给你写。"""
+    task.write(TASK_FILE, records.task_template(task.name, goal or "<要什么，一句话>"))
+    task.record("指令", goal or "写指令（步骤与验收待填）")
 
 
 def review(task: Task, root: Path) -> tuple[bool, list[str]]:
     """跑契约的机械核对，结果写进报告的审查者报告，并记流水。"""
     from . import report
 
-    if not task.file(CONTRACT).is_file():
-        return False, ["还没有契约"]
-    result = report.audit_contract(root, task.file(CONTRACT))
+    if not task.file(TASK_FILE).is_file():
+        return False, ["还没有指令"]
+    result = report.audit_instruction(root, task.file(TASK_FILE))
     body = [f"{'✓' if mark == '✓' else '✗'} {note}" for note, mark, _ in result.rows if mark != "闸门"]
     body += [f"⧗ {note}（留给闸门）" for note, mark, _ in result.rows if mark == "闸门"]
     task.fill_in(task.record_file(REPORT), "审查者报告", body)

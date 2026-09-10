@@ -8,10 +8,10 @@
 
 ```text
 data/
-├── tasks/      任务在飞的：task.md / materials.md / contract.md / log.jsonl
+├── tasks/      任务在飞的：task.md（指令：目标 / 步骤 / 验收）、materials.md、log.jsonl
 ├── report/     报告（侧重事件）：生成者产出 / 审查者报告 / 人类裁决 / 最终成果
 ├── history/    历史（侧重叙事）：这个任务的来龙去脉，人写
-└── samples/    判例：真实契约与真实报告
+└── samples/    判例：真实指令与真实报告
 ```
 
 程序默认就写在这里（`kg --data`，缺省即本仓 `data/`）；要写别处必须显式指路。

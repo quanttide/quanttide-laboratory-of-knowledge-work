@@ -46,7 +46,7 @@ from . import report
 
 STEPS = (
     ("材料", "material", "记一条材料"),
-    ("契约", "contract", "以记下的材料立契约"),
+    ("指令", "instruction", "写指令：目标 / 步骤 / 验收（判据写在验收里）"),
     ("核对", "review", "跑机械核对，结果写进案卷"),
     ("产出", "output", "记一笔产出"),
     ("裁决", "decision", "写下裁决"),
@@ -90,8 +90,8 @@ SPECS = (
     Spec("工作区", "审计", "契约有而工作区无、工作区有而契约无", ("补建缺的资产",), lambda root, v: report.audit(root, make=bool(v.get("补建缺的资产"))), "审计.json", lambda root, v: report.audit_payload(root)),
     Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, value(v, "名字"), bool(v.get("看正文")))),
     Spec("查看", "看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
-    Spec("契约", "写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_contract(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
-    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件", "写入报告（可留空）"), lambda root, v: report.audit_contract(root, Path(value(v, "契约文件")), Path(value(v, "写入报告（可留空）")) if value(v, "写入报告（可留空）") else None)),
+    Spec("指令", "写指令骨架", "目标 / 步骤 / 验收", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_instruction(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
+    Spec("指令", "核对指令", "三段齐不齐、机械核对过不过、闸门项有哪些", ("指令文件", "写入报告（可留空）"), lambda root, v: report.audit_instruction(root, Path(value(v, "指令文件")), Path(value(v, "写入报告（可留空）")) if value(v, "写入报告（可留空）") else None)),
     Spec("报告", "写报告骨架", "生成者产出 / 审查者报告 / 人类裁决 / 最终成果", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_report(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
     Spec("报告", "核对报告", "四段齐不齐", ("报告文件",), lambda root, v: report.audit_report(Path(value(v, "报告文件")))),
 )
@@ -142,7 +142,7 @@ class Browser(QWidget):
         self.export_button.clicked.connect(self._export)
         buttons.addWidget(self.export_button)
         self.about_button = QPushButton("以选中项立契约")
-        self.about_button.clicked.connect(self._contract_about)
+        self.about_button.clicked.connect(self._instruction_about)
         buttons.addWidget(self.about_button)
         buttons.addStretch(1)
         right.addLayout(buttons)
@@ -295,14 +295,14 @@ class Browser(QWidget):
                 return item.text()
         return ""
 
-    def _contract_about(self) -> None:
+    def _instruction_about(self) -> None:
         about = self._selected_path()
         if not about:
             self.window().statusBar().showMessage("先在表里选一行")
             return
-        path, _ = QFileDialog.getSaveFileName(self, f"以「{about}」为题立契约", str(self.root), "Markdown (*.md)")
+        path, _ = QFileDialog.getSaveFileName(self, f"以「{about}」为题写指令", str(self.root), "Markdown (*.md)")
         if path:
-            self.show_result(report.new_contract(Path(path), about))
+            self.show_result(report.new_instruction(Path(path), about))
 
     def _open_row(self, row: int) -> None:
         for col in range(self.table.columnCount()):
@@ -450,6 +450,9 @@ class Desk(QWidget):
             return report.Result(ok=False, lines=["取消了"])
         result = report.task_step(self.root, self.task.name, action, value, self.data, str(self.tasks) if self.tasks else None)
         self.reload()
+        if action == "instruction" and not self.task.stages()["指令"]:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.task.file(task_layer.TASK_FILE))))
+            result.lines.append(f"已打开 {self.task.file(task_layer.TASK_FILE)}——把步骤与验收填上")
         bar.showMessage(result.lines[0] if result.lines else "")
         return result
 

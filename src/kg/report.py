@@ -20,7 +20,7 @@ from . import records
 
 MECHANICAL = ("核对", "结论", "说明")
 SECTIONS = ("段位", "结论")
-STEPS = ("material", "contract", "review", "output", "decision", "finish", "history")
+STEPS = ("material", "instruction", "review", "output", "decision", "finish", "history")
 
 
 @dataclass
@@ -151,26 +151,37 @@ def new_record(target: Path, template: str, about: str = "") -> Result:
     return Result(lines=[f"已写：{target}"] + ([f"以 `{about}` 为题"] if about else []))
 
 
-def new_contract(target: Path, about: str = "") -> Result:
-    return new_record(target, "契约", about)
+def new_instruction(target: Path, goal: str = "") -> Result:
+    if not str(target).strip():
+        return Result(ok=False, lines=["请先写到哪个文件"])
+    if target.exists():
+        return Result(ok=False, lines=[f"已存在：{target}"])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(records.task_template(target.stem, goal), encoding="utf-8")
+    return Result(lines=[f"已写：{target}"])
 
 
 def new_report(target: Path, title: str = "") -> Result:
     return new_record(target, records.report_template(title), title)
 
 
-def audit_contract(root: Path, target: Path, into: Path | None = None) -> Result:
+def audit_instruction(root: Path, target: Path, into: Path | None = None) -> Result:
     if not str(target).strip():
-        return Result(ok=False, lines=["请先选契约文件"])
+        return Result(ok=False, lines=["请先选指令文件"])
     if not target.is_file():
         return Result(ok=False, lines=[f"没有这个文件：{target}"])
-    missing = records.missing_sections(target, records.CONTRACT_SECTIONS)
+    missing = records.missing_sections(target, records.TASK_SECTIONS)
     result = Result(ok=not missing, columns=MECHANICAL)
-    result.lines += [f"  {'✓' if name not in missing else '✗'} {name}" for name in records.CONTRACT_SECTIONS]
+    result.lines += [f"  {'✓' if name not in missing else '✗'} {name}" for name in records.TASK_SECTIONS]
     if missing:
-        result.lines.append(f"契约不完整：缺 {'、'.join(missing)}")
+        result.lines.append(f"指令不完整：缺 {'、'.join(missing)}")
         return result
-    result.lines.append("契约完整。")
+    empty = [name for name in ("步骤", "验收") if not records.read_sections(target).get(name)]
+    if empty:
+        result.ok = False
+        result.lines.append(f"指令还空着：{'、'.join(empty)}——三段齐全才算写完")
+        return result
+    result.lines.append("指令完整。")
     results, gates = checks_layer.run(root, checks_layer.parse(target.read_text(encoding="utf-8")))
     result.rows = [(item.note, "✓" if ok else "✗", detail) for item, ok, detail in results]
     result.rows += [(item.note, "闸门", "留给人拍板") for item in gates]
@@ -280,10 +291,10 @@ def task_step(root: Path, name: str, action: str, value: str = "", data: Path | 
         fields = f"{mat.type} / {mat.stage} / {mat.created_at or '（缺时间）'} / {mat.source}"
         task_layer.add_material(task, rel, fields)
         message = f"记下材料：{rel}"
-    elif action == "contract":
-        about = value.strip() or (task.items(task_layer.MATERIALS)[0].split("　")[0].strip("`") if task.items(task_layer.MATERIALS) else "")
-        task_layer.write_contract(task, about)
-        message = f"写好契约：{short(root, task.file(task_layer.CONTRACT))}" + (f"（以 {about} 为题）" if about else "")
+    elif action == "instruction":
+        goal = value.strip() or (task.items(task_layer.MATERIALS)[0].split("　")[0].strip("`") if task.items(task_layer.MATERIALS) else "")
+        task_layer.write_instruction(task, goal)
+        message = f"写出指令骨架：{short(root, task.file(task_layer.TASK_FILE))}——步骤与验收要你填"
     elif action == "review":
         ok, lines = task_layer.review(task, root)
         message = f"核对完了，审查者报告已写进 {short(root, task.record_file(task_layer.REPORT))}" if ok else "核对没过：" + "；".join(lines[:2])

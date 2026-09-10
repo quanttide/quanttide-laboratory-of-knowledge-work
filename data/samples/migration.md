@@ -1,20 +1,17 @@
-# 契约：把主体第二大脑里属于本领域的文档迁入本领域
+# 任务：把主体第二大脑里属于本领域的文档迁入本领域
 
 ## 目标
 
 把主体第二大脑里属于本领域的文档迁入本领域。
 
-## 输出形态
+## 步骤
 
-目标侧一份 Markdown 文档；源侧净缩短；逐层指针更新。
+- 判归属：这份文档是哪件资产
+- 定落点：与源位置同构
+- 搬运：先写目标侧，再删源侧
+- 逐层更新指针
 
-## 必须包含
-
-- 归属判定（它是哪件资产）
-- 落点（与源位置同构）
-- 来源（原位置）
-
-## 检查项
+## 验收
 
 - [ ] 机械：目标侧文件已就位 `path:examples/default/docs/index.md`
 - [ ] 机械：源侧文件已删除 `absent:/home/iguo/repos/quanttide/default/quanttide-tech/apps/qtdata/examples/default/modules/default.md`

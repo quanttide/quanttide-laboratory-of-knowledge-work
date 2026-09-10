@@ -71,15 +71,15 @@ def links(real: Path) -> None:
     """动作之间的四条链接：立契约、写案卷、补格子、串成任务。"""
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "报告.md"
-        result = report.audit_contract(real, LAB / "data" / "samples" / "migration.md", into=target)
+        result = report.audit_instruction(real, LAB / "data" / "samples" / "migration.md", into=target)
         text = target.read_text(encoding="utf-8") if target.is_file() else ""
-        test("链接①：核对契约把审查者报告写进报告", result.ok and "## 审查者报告" in text and "✓ 机械：目标侧文件已就位" in text)
+        test("链接①：核对指令把审查者报告写进报告", result.ok and "## 审查者报告" in text and "✓ 机械：目标侧文件已就位" in text)
         test("链接①：写出来的报告自查通过", report.audit_report(target).ok)
 
-        target = Path(tmp) / "契约.md"
-        report.new_contract(target, "data/journal/README.md")
+        target = Path(tmp) / "指令.md"
+        report.new_instruction(target, "改 data/journal/README.md")
         fresh = target.read_text(encoding="utf-8")
-        test("链接③：以某件东西为题立契约", "改 `data/journal/README.md`" in fresh and "来源：`data/journal/README.md`" in fresh)
+        test("链接③：以某件东西为题写指令", "## 目标" in fresh and "改 data/journal/README.md" in fresh, fresh[:40])
 
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "second-brain"
@@ -98,10 +98,14 @@ def links(real: Path) -> None:
         report.task_new(root, "试一条路", data, None, "把动作串起来")
         start_state = report.task_status(root, "试一条路", data)
         test("主轴：开工时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
-        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这个任务。"))
+        walk = (("material", "data/journal/2026-09-10.md"), ("instruction", "把纪律落下来"), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这个任务。"))
         marks = []
         for action, given in walk:
             step = report.task_step(root, "试一条路", action, given, data)
+            if action == "instruction":  # 指令要人填步骤与验收，补齐了才点亮
+                one = task_layer.open_task(root, "试一条路", data)
+                one.write(task_layer.TASK_FILE, records.task_template("试一条路", "把纪律落下来").replace("- <怎么走，一步一步>", "- 改落点\n- 写纪律").replace("- [ ] 机械：<能写成断言的> `path:data/journal/README.md`", "- [ ] 机械：纪律在案 `path:data/journal/2026-09-10.md`").replace("- [ ] 闸门：<只能人拍板的>", "- [ ] 闸门：创始人点头"))
+                step = report.task_status(root, "试一条路", data)
             marks.append([row[1] for row in step.rows].count("✓"))
         test("主轴：七步顺次点亮", marks == [1, 2, 3, 4, 5, 6, 7], f"实得 {marks}")
         task = task_layer.open_task(root, "试一条路", data)
@@ -130,10 +134,10 @@ def gui_smoke(real: Path) -> None:
     test("界面：目录出得了表", bool(browser.run_current().rows))
     browser.select_action("审计")
     test("界面：审计通过", browser.run_current().ok)
-    browser.select_action("核对契约")
-    browser.widgets["契约文件"].setText(str(LAB / "data" / "samples" / "migration.md"))
+    browser.select_action("核对指令")
+    browser.widgets["指令文件"].setText(str(LAB / "data" / "samples" / "migration.md"))
     audit = browser.run_current()
-    test("界面：核对真实契约", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
+    test("界面：核对真实指令", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
     browser.select_action("目录")
     browser.run_current()
     browser.table.setCurrentCell(0, 1)
@@ -141,8 +145,8 @@ def gui_smoke(real: Path) -> None:
     browser.select_action("找文档")
     test("界面：空输入先拦住", not browser.run_current().ok)
     groups = [spec.group for spec in gui.SPECS]
-    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "契约", "契约", "报告", "报告"], str(groups))
-    test("台面：七步都在", len(gui.STEPS) == 7 and gui.STEPS[-1][0] == "历史")
+    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "指令", "指令", "报告", "报告"], str(groups))
+    test("台面：七步都在", len(gui.STEPS) == 7 and [s[0] for s in gui.STEPS] == ["材料", "指令", "核对", "产出", "裁决", "成果", "历史"], str([s[0] for s in gui.STEPS]))
 
     with tempfile.TemporaryDirectory() as tmp:
         fake = fake_repo(Path(tmp) / "desk")
@@ -156,7 +160,7 @@ def gui_smoke(real: Path) -> None:
         desk.reload()
         test("台面：状态表跟着走", desk.state_table.item(0, 1).text() == "✓" and desk.state_table.item(1, 1).text() == "—")
         test("台面：流水表有记录", desk.log_table.rowCount() >= 2, f"{desk.log_table.rowCount()} 行")
-        test("台面：下一步指向契约", "契约" in desk.next_label.text(), desk.next_label.text())
+        test("台面：下一步指向指令", "指令" in desk.next_label.text(), desk.next_label.text())
     window.close()
     del app
 
@@ -180,7 +184,7 @@ def main() -> int:
     test("按名词条命中规格", any("material.md" in str(e.path) for e in hits), f"实得 {[str(e.path) for e in hits]}")
     test("模糊兜底命中", bool(catalog.find("日志规范")), "「日志规范」应能落到日志相关条目")
 
-    contract_text = """## 检查项
+    contract_text = """## 验收
 
 - [ ] 机械：目标侧文件已就位 `path:quanttide-demo-toolkit`
 - [ ] 机械：旧文件已删除 `absent:gone.md`
@@ -201,7 +205,8 @@ def main() -> int:
         failed = [ok for _, ok, _ in checks_layer.run(root, items)[0]]
         test("检查项：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
 
-    test("记录的段位取自同一处", records.CONTRACT_SECTIONS == ("目标", "输出形态", "必须包含", "检查项"), "契约四段")
+    test("任务指令是手册三段", records.TASK_SECTIONS == ("目标", "步骤", "验收"), str(records.TASK_SECTIONS))
+    test("判据住在验收里", records.CHECK_SECTION == "验收")
     test("报告段位是四段（事件）", records.REPORT_SECTIONS == ("生成者产出", "审查者报告", "人类裁决", "最终成果"), str(records.REPORT_SECTIONS))
     test("历史是叙事不是段位", "##" not in records.HISTORY_PLACEHOLDER)
 
