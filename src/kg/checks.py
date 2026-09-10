@@ -27,7 +27,7 @@ RULES = ("path", "absent", "file", "contains", "run")
 class Item:
     """一条要跑的判据：说明 + 怎么判（kind 为空即不跑，交给智能体或人）。"""
 
-    note: str
+    description: str
     kind: str | None = None
     args: tuple[str, ...] = field(default_factory=tuple)
 
@@ -47,9 +47,9 @@ class Item:
         return ""
 
 
-def note_of(criterion: dict) -> str:
+def description_of(criterion: dict) -> str:
     """说明：写了就用写的，没写按字段拼一句。"""
-    written = str(criterion.get("note", "")).strip()
+    written = str(criterion.get("description", "")).strip()
     if written:
         return written
     if "path" in criterion:
@@ -67,18 +67,18 @@ def items_of(criteria: list[dict]) -> list[Item]:
     """把定义里的判据翻成要跑的东西：rule 的跑，agent / human 的不跑。"""
     items: list[Item] = []
     for criterion in criteria:
-        note = note_of(criterion)
+        description = description_of(criterion)
         if criterion.get("type") != "rule":
-            items.append(Item(note))
+            items.append(Item(description))
             continue
         if "path" in criterion:
-            items.append(Item(note, "path", (str(criterion["path"]).strip(),)))
+            items.append(Item(description, "path", (str(criterion["path"]).strip(),)))
         elif "absent" in criterion:
-            items.append(Item(note, "absent", (str(criterion["absent"]).strip(),)))
+            items.append(Item(description, "absent", (str(criterion["absent"]).strip(),)))
         elif "file" in criterion:
-            items.append(Item(note, "contains", (str(criterion["file"]).strip(), str(criterion["contains"]))))
+            items.append(Item(description, "contains", (str(criterion["file"]).strip(), str(criterion["contains"]))))
         elif "run" in criterion:
-            items.append(Item(note, "run", (str(criterion["run"]),)))
+            items.append(Item(description, "run", (str(criterion["run"]),)))
     return items
 
 

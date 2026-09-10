@@ -137,7 +137,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 工作流：{task.workflow_name()}（步骤：{steps}）
 这一步：{step.name}
 做什么：
-{step.what}
+{step.description}
 
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
 {criteria_text(step)}
@@ -160,18 +160,18 @@ def run_ai(prompt: str, root: Path, timeout: int = 900) -> tuple[bool, str]:
 
 
 def criteria_text(step: workflow_layer.Step) -> str:
-    lines = [f"- {criterion.get('type')}：{checks_layer.note_of(criterion) or criterion.get('note', '')}" for criterion in step.criteria]
+    lines = [f"- {criterion.get('type')}：{checks_layer.description_of(criterion) or criterion.get('description', '')}" for criterion in step.criteria]
     return "\n".join(lines) or "（这一步没有判据）"
 
 
 def judge_prompt(task: "Task", step: workflow_layer.Step, criteria: list[dict]) -> str:
     """交给智能体审的那一段话：产物 + 判准，逐条回答。"""
-    listed = "\n".join(f"{index}. {criterion.get('note')}" for index, criterion in enumerate(criteria, start=1))
+    listed = "\n".join(f"{index}. {criterion.get('description')}" for index, criterion in enumerate(criteria, start=1))
     return f"""你是审查者，不是执行者。别改产物、别改判据文件。
 
 工作区：{task.root}
 要审的东西：这一步的产物在 {task.artifacts_dir}（也可以看工作区里相关文件）
-这一步做什么：{step.what}
+这一步做什么：{step.description}
 
 判准（逐条判）：
 {listed}
@@ -185,7 +185,7 @@ def judge_by_ai(task: "Task", step: workflow_layer.Step, criteria: list[dict], r
     ran, out = run_ai(judge_prompt(task, step, criteria), root)
     rows = []
     for index, criterion in enumerate(criteria, start=1):
-        note = str(criterion.get("note", "")).strip()
+        note = str(criterion.get("description", "")).strip()
         if not ran:
             rows.append((note, "待判", f"智能体没跑成：{one_line(out)}"))
             continue
@@ -227,19 +227,19 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
         return True, lines, []
     results, _ = checks_layer.run(root, checks_layer.items_of(found.rules))
     judged = judge_by_ai(task, found, found.agents, root) if (auto and found.agents) else [
-        (str(criterion.get("note", "")).strip(), "待判", "没跑智能体（人为地记一步）") for criterion in found.agents
+        (str(criterion.get("description", "")).strip(), "待判", "没跑智能体（人为地记一步）") for criterion in found.agents
     ]
-    gates = [str(criterion.get("note", "")).strip() for criterion in found.gates]
+    gates = [str(criterion.get("description", "")).strip() for criterion in found.gates]
     ok = all(passed for _, passed, _ in results) and all(verdict == "✓" for _, verdict, _ in judged)
-    detail = note.strip() or ("；".join(item.note for item, _, _ in results) if results else "做完")
+    detail = note.strip() or ("；".join(item.description for item, _, _ in results) if results else "做完")
     if not (auto and not found.human):
         task.record(step, detail, ok=ok)
     write_report(task, gates + [note for note, verdict, _ in judged if verdict != "✓"])
     lines.append(f"{'✓' if ok else '✗'} {step}：{detail}")
-    lines += [f"  {'✓' if passed else '✗'} {item.note}（{spec}）" for item, passed, spec in results]
+    lines += [f"  {'✓' if passed else '✗'} {item.description}（{spec}）" for item, passed, spec in results]
     lines += [f"  {verdict} {note}（{reason}）" for note, verdict, reason in judged]
     lines += [f"  ⧗ {note}（留给人）" for note in gates]
-    rows = [(item.note, "✓" if passed else "✗", spec) for item, passed, spec in results]
+    rows = [(item.description, "✓" if passed else "✗", spec) for item, passed, spec in results]
     rows += [(note, verdict, reason) for note, verdict, reason in judged]
     return ok, lines, rows + [(note, "闸门", "留给人拍板") for note in gates]
 

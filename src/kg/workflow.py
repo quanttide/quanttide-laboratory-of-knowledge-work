@@ -10,14 +10,14 @@
   description: 比对两边的档案
   steps:
     - name: 定位
-      what: 把两边的源找齐
+      description: 把两边的源找齐
       executor: 智能体
       criteria:
         - type: rule
-          note: 个人课程档案在
+          description: 个人课程档案在
           path: data/profile/iGuo/course/index.md
         - type: human
-          note: 创始人点头（回流与并法怎么定）
+          description: 创始人点头（回流与并法怎么定）
 """
 
 from pathlib import Path
@@ -30,8 +30,8 @@ RULE = "rule"
 EXECUTORS = (AGENT, HUMAN)
 TYPES = (RULE, AGENT, HUMAN)
 TOP_FIELDS = ("name", "description", "steps")
-STEP_FIELDS = ("name", "what", "executor", "criteria")
-CRITERION_FIELDS = ("type", "note", "path", "absent", "file", "contains", "run")
+STEP_FIELDS = ("name", "description", "executor", "criteria")
+CRITERION_FIELDS = ("type", "description", "path", "absent", "file", "contains", "run")
 
 
 def lab_data() -> Path:
@@ -95,8 +95,8 @@ def load(path: Path) -> dict:
                 if len(others) > 1 or (others and "file" in given):
                     raise WorkflowError(f"{Path(path).name} {where}的判法只能一种：path / absent / file+contains / run")
             else:
-                if not str(criterion.get("note", "")).strip():
-                    raise WorkflowError(f"{Path(path).name} {where}是 {kind}，必须写 note（判准）")
+                if not str(criterion.get("description", "")).strip():
+                    raise WorkflowError(f"{Path(path).name} {where}是 {kind}，必须写 description（判准 / 要人拍板的事）")
                 if given:
                     raise WorkflowError(f"{Path(path).name} {where}是 {kind}，不该带 {'、'.join(given)}（那是 rule 的字段）")
     return payload
@@ -113,8 +113,9 @@ class Step:
         return str(self.payload.get("name", "")).strip()
 
     @property
-    def what(self) -> str:
-        return str(self.payload.get("what", "")).strip()
+    def description(self) -> str:
+        """这一步做什么——给执行者的话。"""
+        return str(self.payload.get("description", "")).strip()
 
     @property
     def executor(self) -> str:
@@ -187,11 +188,11 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
         "steps": [
             {
                 "name": step,
-                "what": f"<{step}这一步做什么>",
+                "description": f"<{step}这一步做什么>",
                 "executor": AGENT,
                 "criteria": [
                     {"type": RULE, "path": "data/journal/README.md"},
-                    {"type": HUMAN, "note": "<只能人拍板的>"},
+                    {"type": HUMAN, "description": "<只能人拍板的>"},
                 ],
             }
             for step in steps

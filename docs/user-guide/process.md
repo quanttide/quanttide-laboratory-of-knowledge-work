@@ -16,7 +16,7 @@ name: 课程档案比对
 description: 比对两边的档案
 steps:
   - name: 定位
-    what: 把两边的源找齐
+    description: 把两边的源找齐
     executor: agent             # agent | human；默认 agent
     criteria:
       - type: rule              # rule：规则引擎按字段判（看什么 + 要什么）
@@ -26,7 +26,7 @@ steps:
         note: 课程研发档案在
         path: /home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
   - name: 核对
-    what: 逐项对照，落成一件产物
+    description: 逐项对照，落成一件产物
     executor: human             # 要人做必须显式写
     criteria:
       - type: rule
@@ -51,7 +51,9 @@ steps:
 
 **谁做**（`executor`）也是这两类：`agent`（默认）或 `human`。
 
-不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / what / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `note` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
+三处都叫 `description`，各说一层：顶层描述整条工作流、步骤描述这一步做什么（执行者照它干）、判据描述这一条是什么（`agent` / `human` 那格就是判准与拍板事项）。
+
+不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / description / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `note` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
 
 **可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者与判据主体——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 

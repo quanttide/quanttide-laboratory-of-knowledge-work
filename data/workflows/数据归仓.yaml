@@ -2,30 +2,30 @@ name: 数据归仓
 description: 步骤串联：写清每步做什么、怎么算完。
 steps:
 - name: 材料
-  what: 材料
   executor: agent
   criteria: []
+  description: 材料
 - name: 指令
-  what: 指令
   executor: agent
   criteria: []
+  description: 指令
 - name: 核对
-  what: 核对
   executor: agent
   criteria: []
+  description: 核对
 - name: 产出
-  what: 产出
   executor: agent
   criteria: []
+  description: 产出
 - name: 裁决
-  what: 裁决
   executor: agent
   criteria: []
+  description: 裁决
 - name: 成果
-  what: 成果
   executor: agent
   criteria: []
+  description: 成果
 - name: 历史
-  what: 历史
   executor: agent
   criteria: []
+  description: 历史

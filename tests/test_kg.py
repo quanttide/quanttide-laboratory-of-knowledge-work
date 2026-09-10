@@ -102,12 +102,12 @@ def workspace(real: Path) -> None:
 def judges(real: Path) -> None:
     """判据：结构化字段（机械带 spec、闸门只有说明），四种 spec 都能跑。"""
     defined = [
-        {"type": "rule", "note": "目标侧文件已就位", "path": "data/journal/README.md"},
-        {"type": "rule", "note": "旧文件已删除", "absent": "gone.md"},
-        {"type": "rule", "note": "含某段文字", "file": "data/journal/README.md", "contains": "日志"},
-        {"type": "rule", "note": "命令跑得通", "run": "test -f data/journal/README.md"},
+        {"type": "rule", "description": "目标侧文件已就位", "path": "data/journal/README.md"},
+        {"type": "rule", "description": "旧文件已删除", "absent": "gone.md"},
+        {"type": "rule", "description": "含某段文字", "file": "data/journal/README.md", "contains": "日志"},
+        {"type": "rule", "description": "命令跑得通", "run": "test -f data/journal/README.md"},
         {"type": "rule", "path": "data/journal"},
-        {"type": "human", "note": "落点与源位置同构"},
+        {"type": "human", "description": "落点与源位置同构"},
     ]
     with tempfile.TemporaryDirectory() as inner:
         root = Path(inner) / "repo"
@@ -117,7 +117,7 @@ def judges(real: Path) -> None:
         results, gates = checks_layer.run(root, items)
         test("判据：rule 跑、human 留给人", len(results) == 5 and len(gates) == 1, f"rule {len(results)}，human {len(gates)}")
         test("判据：四种判法都跑得通", all(ok for _, ok, _ in results), str(results))
-        test("判据：说明可省（按字段拼）", any(item.note == "存在：data/journal" for item, _, _ in results), str([i.note for i, _, _ in results]))
+        test("判据：说明可省（按字段拼）", any(item.description == "存在：data/journal" for item, _, _ in results), str([i.description for i, _, _ in results]))
         (root / "gone.md").write_text("还在\n", encoding="utf-8")
         failed = [ok for _, ok, _ in checks_layer.run(root, items)[0]]
         test("判据：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
@@ -139,10 +139,10 @@ def flow_and_task(real: Path) -> None:
         # 把「比对」这一步写成真的
         payload = flow_layer.load(flow.file)
         step = payload["steps"][1]
-        step["what"] = "把两边比一遍"
+        step["description"] = "把两边比一遍"
         step["criteria"] = [
-            {"type": "rule", "note": "日志在", "path": "data/journal/README.md"},
-            {"type": "human", "note": "创始人过目"},
+            {"type": "rule", "description": "日志在", "path": "data/journal/README.md"},
+            {"type": "human", "description": "创始人过目"},
         ]
         flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
         flow.reload()

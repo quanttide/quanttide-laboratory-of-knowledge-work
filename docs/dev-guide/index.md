@@ -14,7 +14,7 @@ src/kg/
 ├── checks.py    判据：结构化判据（机械带 spec / 闸门只有说明）的执行
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
 ├── records.py   记录的段位与骨架：报告（执行记录 + 闸门项）、历史（叙事）
-├── workflow.py  工作流（YAML）：严格 schema（name / description / steps；步骤 name / what / executor / criteria；判据 type: rule|agent|human）
+├── workflow.py  工作流（YAML）：严格 schema（name / description / steps；步骤 name / description / executor / criteria；判据 type: rule|agent|human）
 ├── task.py      任务（YAML）：工作流的一次执行（状态、走一步、流水、报告、历史）
 └── __main__.py  python3 -m kg
 
