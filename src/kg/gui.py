@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QFontDatabase
+from PySide6.QtGui import QColor, QDesktopServices, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QPlainTextEdit,
     QPushButton,
@@ -44,8 +45,9 @@ def material_paths(values: dict) -> list[str] | None:
 
 @dataclass(frozen=True)
 class Spec:
-    """一个动作：栏目名、说明、要填的字段、怎么跑；能导出的还有取数函数。"""
+    """一个动作：分在哪一组、栏目名、说明、要填的字段、怎么跑；能导出的还有取数函数。"""
 
+    group: str
     name: str
     hint: str
     fields: tuple[str, ...]
@@ -54,15 +56,16 @@ class Spec:
     payload: object = None
 
 
+# 分四组：工作区看整体，查看看一件，契约与案卷各管一种记录
 SPECS = (
-    Spec("找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, v["名字"], v["看正文"])),
-    Spec("目录", "列全部条目——契约 × 目录", (), lambda root, v: report.catalog(root), "目录.json", lambda root, v: report.catalog_payload(root)),
-    Spec("审计", "契约有而工作区无、工作区有而契约无", (), lambda root, v: report.audit(root), "审计.json", lambda root, v: report.audit_payload(root)),
-    Spec("看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
-    Spec("写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.CONTRACT_TEMPLATE)),
-    Spec("写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.DOSSIER_TEMPLATE)),
-    Spec("核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件",), lambda root, v: report.audit_contract(root, Path(v["契约文件"]))),
-    Spec("核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(v["案卷文件"]))),
+    Spec("工作区", "目录", "列全部条目——契约 × 目录", (), lambda root, v: report.catalog(root), "目录.json", lambda root, v: report.catalog_payload(root)),
+    Spec("工作区", "审计", "契约有而工作区无、工作区有而契约无", (), lambda root, v: report.audit(root), "审计.json", lambda root, v: report.audit_payload(root)),
+    Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, v["名字"], v["看正文"])),
+    Spec("查看", "看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
+    Spec("契约", "写契约骨架", "目标 / 输出形态 / 必须包含 / 检查项", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.CONTRACT_TEMPLATE)),
+    Spec("契约", "核对契约", "段位齐不齐、机械核对过不过、闸门项有哪些", ("契约文件",), lambda root, v: report.audit_contract(root, Path(v["契约文件"]))),
+    Spec("案卷", "写案卷骨架", "产出 / 审查 / 裁决 / 成果", ("目标文件",), lambda root, v: report.new_record(Path(v["目标文件"]), records.DOSSIER_TEMPLATE)),
+    Spec("案卷", "核对案卷", "四段齐不齐", ("案卷文件",), lambda root, v: report.audit_dossier(Path(v["案卷文件"]))),
 )
 
 
@@ -75,8 +78,9 @@ class Window(QMainWindow):
         self.spec = SPECS[0]
         self.widgets: dict[str, QWidget] = {}
         self.last_result: report.Result | None = None
+        self.rows: dict[int, Spec | None] = {}  # 列表行号 → 动作（分组的表头为 None）
         self._build()
-        self.list.setCurrentRow(0)
+        self.select_action(SPECS[0].name)
 
     # ---- 界面 ----
     def _build(self) -> None:
@@ -96,7 +100,7 @@ class Window(QMainWindow):
 
         columns = QHBoxLayout()
         self.list = QListWidget()
-        self.list.addItems([spec.name for spec in SPECS])
+        self.fill_actions()
         self.list.setFixedWidth(150)
         self.list.currentRowChanged.connect(self._select)
         columns.addWidget(self.list)
@@ -144,8 +148,36 @@ class Window(QMainWindow):
 
         self.statusBar().showMessage("选好动作，点执行。表里带路径的行，双击就用系统默认程序打开。")
 
+    def fill_actions(self) -> None:
+        """填空动作列表：分组表头不可选，其余一行一个动作。"""
+        group = None
+        for spec in SPECS:
+            if spec.group != group:
+                group = spec.group
+                header = QListWidgetItem(group)
+                header.setFlags(Qt.ItemFlag.ItemIsEnabled)  # 能看不能选
+                font = header.font()
+                font.setBold(True)
+                header.setFont(font)
+                header.setForeground(QColor("#666666"))
+                self.list.addItem(header)
+                self.rows[self.list.count() - 1] = None
+            self.list.addItem(QListWidgetItem(spec.name))
+            self.rows[self.list.count() - 1] = spec
+
+    def select_action(self, name: str) -> None:
+        """按名字选中动作——表头占了行号，别按序号选。"""
+        for row, spec in self.rows.items():
+            if spec and spec.name == name:
+                self.list.setCurrentRow(row)
+                return
+        raise KeyError(name)
+
     def _select(self, row: int) -> None:
-        self.spec = SPECS[row]
+        spec = self.rows.get(row)
+        if spec is None:  # 点到分组表头，什么也不做
+            return
+        self.spec = spec
         while self.form.count():
             item = self.form.takeAt(0)
             if widget := item.widget():

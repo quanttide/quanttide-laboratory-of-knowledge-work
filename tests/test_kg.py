@@ -65,16 +65,17 @@ def gui_smoke(real: Path) -> None:
         return
     app = QApplication.instance() or QApplication([])
     window = gui.Window(real)
-    window.list.setCurrentRow(1)  # 目录
+    window.select_action("目录")
     test("界面：目录出得了表", bool(window.run_current().rows))
-    window.list.setCurrentRow(2)  # 审计
+    window.select_action("审计")
     test("界面：审计通过", window.run_current().ok)
-    window.list.setCurrentRow(6)  # 核对契约
+    window.select_action("核对契约")
     window.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
     audit = window.run_current()
     test("界面：核对真实契约", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
-    window.list.setCurrentRow(0)  # 找文档：空输入先拦
+    window.select_action("找文档")
     test("界面：空输入先拦住", not window.run_current().ok)
+    test("界面：动作分四组", [spec.group for spec in gui.SPECS] == ["工作区", "工作区", "查看", "查看", "契约", "契约", "案卷", "案卷"])
     window.close()
     del app
 
