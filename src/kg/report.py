@@ -50,7 +50,7 @@ def find(root: Path, name: str, show: bool = False) -> Result:
     return result
 
 
-def list_all(root: Path) -> Result:
+def catalog(root: Path) -> Result:
     catalog = catalog_layer.build(root)
     result = Result(columns=("种类", "路径"))
     for entry in catalog.entries:
@@ -60,7 +60,7 @@ def list_all(root: Path) -> Result:
     return result
 
 
-def list_payload(root: Path) -> dict:
+def catalog_payload(root: Path) -> dict:
     catalog = catalog_layer.build(root)
     return {
         "root": root.name,

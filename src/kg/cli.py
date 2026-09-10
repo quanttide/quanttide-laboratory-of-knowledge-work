@@ -1,7 +1,7 @@
 """入口：一个程序，九个动作（含开图形界面）。
 
   kg find <名字> [--show]        按名找文档——认文件名与中文标题
-  kg list [--json 文件]          看全库 / 导出目录
+  kg catalog [--json 文件]       看目录 / 导出目录
   kg audit [--json 文件]         审计——契约有而工作区无、工作区有而契约无
   kg material [路径…] [--json]   看材料——类型、内容、来源、时间、阶段
   kg new-contract <文件>         写契约骨架（目标 / 输出形态 / 必须包含 / 检查项）
@@ -32,10 +32,10 @@ def cmd_find(root: Path, args) -> int:
     return emit(report.find(root, args.name, args.show))
 
 
-def cmd_list(root: Path, args) -> int:
-    result = report.list_all(root)
+def cmd_catalog(root: Path, args) -> int:
+    result = report.catalog(root)
     if args.json:
-        payload = report.list_payload(root)
+        payload = report.catalog_payload(root)
         catalog_layer.write_json(Path(args.json), payload)
         print(f"已导出：{args.json}（{payload['count']} 条）")
         return 0
@@ -95,7 +95,7 @@ def build_parser() -> argparse.ArgumentParser:
     find.add_argument("name", metavar="名字")
     find.add_argument("--show", action="store_true", help="连正文一起看")
 
-    listing = sub.add_parser("list", help="列全库")
+    listing = sub.add_parser("catalog", help="看目录")
     listing.add_argument("--json", metavar="文件")
 
     audit = sub.add_parser("audit", help="审计工作区")
@@ -115,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 HANDLERS = {
     "find": cmd_find,
-    "list": cmd_list,
+    "catalog": cmd_catalog,
     "audit": cmd_audit,
     "material": cmd_material,
     "new-contract": cmd_new_contract,

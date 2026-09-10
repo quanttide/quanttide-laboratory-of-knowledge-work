@@ -65,8 +65,8 @@ def gui_smoke(real: Path) -> None:
         return
     app = QApplication.instance() or QApplication([])
     window = gui.Window(real)
-    window.list.setCurrentRow(1)  # 全库
-    test("界面：全库出得了表", bool(window.run_current().rows))
+    window.list.setCurrentRow(1)  # 目录
+    test("界面：目录出得了表", bool(window.run_current().rows))
     window.list.setCurrentRow(2)  # 审计
     test("界面：审计通过", window.run_current().ok)
     window.list.setCurrentRow(6)  # 核对契约

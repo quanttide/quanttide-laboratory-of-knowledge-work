@@ -23,7 +23,7 @@ uv venv .venv && uv pip install -e ".[gui]"
 | 动作 | 干什么 |
 |------|--------|
 | `kg find <名字>` | 按名找文档——认文件名与中文标题 |
-| `kg list` | 列全库，可导 JSON |
+| `kg catalog` | 看目录——列全部条目，可导 JSON |
 | `kg audit` | 审计——契约有而工作区无、工作区有而契约无 |
 | `kg material [路径…]` | 看材料——类型、内容、来源、时间，阶段由位置承担 |
 | `kg new-contract` / `kg new-dossier` | 写契约骨架 / 案卷骨架 |
