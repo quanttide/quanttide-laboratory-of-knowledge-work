@@ -30,7 +30,7 @@ ASSETS = (
     ("语境", "data/context"),
     ("归档", "data/archive"),
     ("章程", "docs/bylaw"),
-    ("标准", "docs/specification"),
+    ("规格", "docs/specification"),
     ("工具箱", "packages/quanttide-work-toolkit"),
     ("手册", "docs/handbook"),
     ("案例", "docs/gallery"),
