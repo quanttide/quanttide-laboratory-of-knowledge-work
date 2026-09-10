@@ -1,3 +1,4 @@
+name: 数据归仓
 description: 步骤串联：写清每步做什么、怎么算完。
 steps:
 - name: 材料

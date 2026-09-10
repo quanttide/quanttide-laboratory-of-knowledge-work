@@ -1,3 +1,4 @@
+name: AI冒烟
 description: 一步到底：让 AI 写一句话，机械判据核对。
 steps:
 - name: 问候

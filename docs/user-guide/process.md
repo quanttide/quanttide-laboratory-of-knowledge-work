@@ -12,6 +12,7 @@ $ kg workflow --new 课程档案比对 --steps 定位,比对,结论 --note "比�
 落在 `data/workflows/<名字>.yaml`——**定义用 YAML，因为定义要「意义固定」**（字段、取值、判据种类都由 schema 定死，谁读都是同一件事）：
 
 ```yaml
+name: 课程档案比对
 description: 比对两边的档案
 steps:
   - name: 定位
@@ -52,7 +53,7 @@ steps:
 
 三处都叫 `description`，各说一层：顶层描述整条工作流、步骤描述这一步做什么（执行者照它干）、判据描述这一条是什么（`agent` / `human` 那格就是判准与拍板事项）。
 
-不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `description / steps`（名字在文件名里），步骤只认 `name / description / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `description` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
+不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / description / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `description` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
 
 **可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者与判据主体——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 
@@ -133,7 +134,7 @@ $ kg task 课程档案比对 --journal "先找齐两边，再按口径 / 重叠 
 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
-data/tasks/<任务>.yaml         实例（YAML）：一行 workflow（名在文件名里）
+data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流（要什么由工作流的 description 说）
 data/tasks/<任务>.jsonl          流水：跟着任务走（只增不改）
 data/artifacts/report/<任务>.md   报告：程序维护「执行记录」「闸门项」两节，其余节是人 / AI 写的产物
 data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙去脉

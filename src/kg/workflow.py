@@ -6,6 +6,7 @@
 
 <数据仓>/workflows/<名字>.yaml
 
+  name: 课程档案比对
   description: 比对两边的档案
   steps:
     - name: 定位
@@ -28,7 +29,7 @@ HUMAN = "human"
 RULE = "rule"
 EXECUTORS = (AGENT, HUMAN)
 TYPES = (RULE, AGENT, HUMAN)
-TOP_FIELDS = ("description", "steps")
+TOP_FIELDS = ("name", "description", "steps")
 STEP_FIELDS = ("name", "description", "executor", "criteria")
 CRITERION_FIELDS = ("executor", "description", "path", "absent", "file", "contains", "run")
 
@@ -54,6 +55,8 @@ def load(path: Path) -> dict:
         raise WorkflowError(f"{Path(path).name} 不是合法的 YAML：{error}") from error
     if not isinstance(payload, dict):
         raise WorkflowError(f"{Path(path).name} 的顶层不是映射（name / steps）")
+    if not str(payload.get("name", "")).strip():
+        raise WorkflowError(f"{Path(path).name} 少了 name")
     steps = payload.get("steps")
     if not isinstance(steps, list) or not steps:
         raise WorkflowError(f"{Path(path).name} 少了 steps（至少一个步骤）")
@@ -180,6 +183,7 @@ class Workflow:
 def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
     """写一条工作流：步骤串联，每步给一份判据骨架（执行者默认 AI）。"""
     payload = {
+        "name": name,
         "description": note or "步骤串联：写清每步做什么、谁执行、怎么判。",
         "steps": [
             {
@@ -218,10 +222,11 @@ def export(flow: Workflow, target: Path) -> Path:
 def import_workflow(data: Path, source: Path, name: str = "") -> Workflow:
     """把一份工作流导进来：先照 schema 验一遍，再起个名字落进 workflows/。"""
     payload = load(Path(source))
-    chosen = (name or Path(source).stem).strip()
+    chosen = (name or str(payload.get("name", "")).strip() or Path(source).stem).strip()
     flow = Workflow(Path(data), chosen)
     if flow.exists():
         raise FileExistsError(f"已经有一条工作流叫「{chosen}」：{flow.file}（换名字用 --as）")
+    payload["name"] = chosen
     flow.payload = payload
     flow.file.parent.mkdir(parents=True, exist_ok=True)
     flow.file.write_text(flow.to_yaml(), encoding="utf-8")
