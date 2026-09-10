@@ -21,7 +21,7 @@
   kg task <名字>                 看步骤状态与流水
   kg task <名字> --next           走下一步：执行者是 AI 的交给 AI（pi -p）跑，然后跑判据、记账
   kg task <名字> --done <步骤> [--note 一句话]   人为地记一步（人自己做的）
-  kg task <名字> --history <一段话>   历史：写下这一次的来龙去脉（叙事）
+  kg task <名字> --journal <一段话>   日志：写下这次工作的来龙去脉（叙事）
   （数据默认落在实验室的 data/：工作流 workflows/、任务 tasks/、产物 artifacts/）
 
 默认工作区从当前目录往上找（含 data/journal 的目录）；用 --root 指定别的第二大脑。
@@ -95,8 +95,8 @@ def cmd_task(root: Path, args) -> int:
         return emit(report.task_new(root, data, args.name or "", args.workflow, args.about))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg task <名字>，或 kg task --list / --new <名字> --workflow <工作流>"]))
-    if args.history is not None:
-        return emit(report.task_history(root, data, args.name, args.history if isinstance(args.history, str) else ""))
+    if args.journal is not None:
+        return emit(report.task_journal(root, data, args.name, args.journal if isinstance(args.journal, str) else ""))
     if args.next:
         return emit(report.task_step(root, data, args.name, "", args.note, auto=True))
     if args.done is not None:
@@ -157,7 +157,7 @@ def build_parser() -> argparse.ArgumentParser:
     task.add_argument("--next", action="store_true", help="走下一步（AI 执行者交给 pi 跑）")
     task.add_argument("--done", nargs="?", const=True, metavar="步骤", help="人为地记一步")
     task.add_argument("--note", default="", metavar="一句话", help="记一句这一步做了什么")
-    task.add_argument("--history", nargs="?", const=True, metavar="一段话")
+    task.add_argument("--journal", nargs="?", const=True, metavar="一段话")
     sub.add_parser("gui", help="开图形界面")
     return parser
 

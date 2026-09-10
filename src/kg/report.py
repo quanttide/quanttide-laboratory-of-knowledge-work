@@ -224,7 +224,7 @@ def task_status(root: Path, data: Path, name: str) -> Result:
         result.rows.append((step.name, state))
         result.lines.append(f"  {state} {step.name}")
     result.lines.append(task_layer.state_line(task))
-    result.lines.append(f"产物：{short(data, task.artifact(task_layer.REPORT))}、{short(data, task.artifact(task_layer.HISTORY))}")
+    result.lines.append(f"产物：{short(data, task.artifact(task_layer.REPORT))}、{short(data, task.artifact(task_layer.JOURNAL))}")
     events = task.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")
@@ -262,11 +262,11 @@ def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "",
     return result
 
 
-def task_history(root: Path, data: Path, name: str, words: str) -> Result:
+def task_journal(root: Path, data: Path, name: str, words: str) -> Result:
     task = task_layer.open_task(root, data, name)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not words.strip():
-        return Result(ok=False, lines=[f"历史要人来写：{short(data, task.artifact(task_layer.HISTORY))}"])
+        return Result(ok=False, lines=[f"日志要人来写：{short(data, task.artifact(task_layer.JOURNAL))}"])
     task_layer.narrate(task, words)
-    return Result(lines=[f"历史记下一段：{short(data, task.artifact(task_layer.HISTORY))}", task_layer.state_line(task)])
+    return Result(lines=[f"日志记下一段：{short(data, task.artifact(task_layer.JOURNAL))}", task_layer.state_line(task)])

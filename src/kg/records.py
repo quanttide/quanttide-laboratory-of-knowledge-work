@@ -8,7 +8,7 @@
 from pathlib import Path
 
 REPORT_SECTIONS = ("执行记录", "闸门项")
-HISTORY_PLACEHOLDER = "（这个任务的来龙去脉，你写）"
+JOURNAL_PLACEHOLDER = "（这个任务的来龙去脉，你写）"
 
 REPORT_TEMPLATE = """# 报告：{title}
 
@@ -17,7 +17,7 @@ REPORT_TEMPLATE = """# 报告：{title}
 ## 闸门项
 """
 
-HISTORY_TEMPLATE = """# 历史：{title}
+JOURNAL_TEMPLATE = """# 日志：{title}
 
 {placeholder}
 """
@@ -29,8 +29,8 @@ def report_template(title: str = "") -> str:
     return REPORT_TEMPLATE.format(title=title or "<任务的名字>")
 
 
-def history_template(title: str = "") -> str:
-    return HISTORY_TEMPLATE.format(title=title or "<任务的名字>", placeholder=HISTORY_PLACEHOLDER)
+def journal_template(title: str = "") -> str:
+    return JOURNAL_TEMPLATE.format(title=title or "<任务的名字>", placeholder=JOURNAL_PLACEHOLDER)
 
 
 def read_sections(path: Path) -> dict[str, list[str]]:
@@ -53,7 +53,7 @@ def prose(path: Path) -> str:
     lines = []
     for line in path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("# ") or stripped.startswith("## ") or stripped == HISTORY_PLACEHOLDER:
+        if not stripped or stripped.startswith("# ") or stripped.startswith("## ") or stripped == JOURNAL_PLACEHOLDER:
             continue
         lines.append(stripped)
     return "\n".join(lines)

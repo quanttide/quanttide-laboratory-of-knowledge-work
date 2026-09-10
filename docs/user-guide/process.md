@@ -117,17 +117,17 @@ $ kg task AI冒烟 --next
 $ kg task 课程档案比对
   ✓ 定位   ✓ 比对   ✓ 结论
 3 个步骤都走过了
-产物：artifacts/report/课程档案比对.md、artifacts/history/课程档案比对.md
+产物：artifacts/report/课程档案比对.md、artifacts/journal/课程档案比对.md
 
 $ cat data/artifacts/report/课程档案比对.md     # 执行记录 + 闸门项，机器写
 ```
 
 ## 五、收尾
 
-闸门项留给人拍板；这一趟的来龙去脉写进历史（叙事，人写）：
+闸门项留给人拍板；这一趟的来龙去脉写进日志（叙事，人写）：
 
 ```bash
-$ kg task 课程档案比对 --history "先找齐两边，再按口径 / 重叠 / 缺口 / 格式差四条比……"
+$ kg task 课程档案比对 --journal "先找齐两边，再按口径 / 重叠 / 缺口 / 格式差四条比……"
 ```
 
 ## 数据：三家分放
@@ -135,16 +135,16 @@ $ kg task 课程档案比对 --history "先找齐两边，再按口径 / 重叠 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
 data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流、要什么
+data/tasks/<任务>.jsonl          流水：跟着任务走（只增不改）
 data/artifacts/report/<任务>.md   报告：程序维护「执行记录」「闸门项」两节，其余节是人 / AI 写的产物
-data/artifacts/history/<任务>.md  历史（叙事）
-data/artifacts/log/<任务>.jsonl   流水（只增不改）
+data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙去脉
 
 **程序出的结果就是产物**：落在 `artifacts/` 里按类型分家，可读可改可版控；程序写报告时只动它自己那两节。工作流要引用它们，用占位——不写死任务名：
 
 ```yaml
   - executor: rule
     description: 报告里点到两边的课
-    file: "{{report}}"            # 本任务的报告；还有 {{history}} / {{log}} / {{artifacts}}
+    file: "{{report}}"            # 本任务的报告；还有 {{journal}} / {{log}} / {{artifacts}}
     contains: production-internship
 ```
 ```
@@ -155,6 +155,7 @@ data/artifacts/log/<任务>.jsonl   流水（只增不改）
 
 ## 规矩
 
+- **流水跟着任务走**：`tasks/<任务>.jsonl`；产物（报告、日志）进 `artifacts/` 按类型分家。
 - **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `executor: human` 的判据上（拍板）；
 - **智能体不能审自己那一步**——同一步的执行者与判据若是同一个智能体，等于自评自过（现在实现里是同一个 pi，流水里标了「AI 审查（同一模型）」，将来要换成另一个执行者）；
 

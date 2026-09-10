@@ -46,7 +46,7 @@ $ kg task 课程档案比对 --done 比对 --note "口径 / 重叠 / 缺口 / �
 
 $ kg task 课程档案比对                     # 步骤状态与流水
 $ kg task --list                          # 有哪些任务
-$ kg task 课程档案比对 --history "先找齐两边，再按四条比……"
+$ kg task 课程档案比对 --journal "先找齐两边，再按四条比……"
 ```
 
 **同一件任务 = 同一个工作流的一次执行**；跑第二遍就是另一件任务。走一步记一笔，报告机器写，历史人写。
@@ -58,9 +58,9 @@ $ kg task 课程档案比对 --history "先找齐两边，再按四条比……"
 ```text
 data/workflows/<工作流>.md     定义：串联的步骤与判据
 data/tasks/<任务>.md           实例：跑哪条工作流、要什么
-data/artifacts/report/<任务>.md   报告（事件）
-data/artifacts/history/<任务>.md  历史（叙事）
-data/artifacts/log/<任务>.jsonl   流水
+data/artifacts/report/<任务>.md   报告（事件 + 工作内容）
+data/artifacts/journal/<任务>.md  日志（叙事）
+data/tasks/<任务>.jsonl           流水（跟着任务走）
 ```
 
 ## 窗口

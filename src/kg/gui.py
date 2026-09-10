@@ -376,9 +376,9 @@ class Desk(QWidget):
         export_button = QPushButton("导出工作流…")
         export_button.clicked.connect(self._export_workflow)
         row.addWidget(export_button)
-        history_button = QPushButton("写历史…")
-        history_button.clicked.connect(self.write_history)
-        row.addWidget(history_button)
+        journal_button = QPushButton("写日志…")
+        journal_button.clicked.connect(self.write_journal)
+        row.addWidget(journal_button)
         outer.addLayout(row)
 
         self.log_table = QTableWidget(0, 3)
@@ -466,12 +466,12 @@ class Desk(QWidget):
         bar.showMessage(result.lines[0] if result.lines else "")
         return result
 
-    def write_history(self) -> None:
+    def write_journal(self) -> None:
         if self.task is None:
             return
-        words, ok = QInputDialog.getMultiLineText(self, "历史", "这一次的来龙去脉（报告记事，历史叙事）")
+        words, ok = QInputDialog.getMultiLineText(self, "日志", "这一次的来龙去脉（报告记事，日志叙事）")
         if ok and words.strip():
-            report.task_history(self.root, self.data, self.task.name, words.strip())
+            report.task_journal(self.root, self.data, self.task.name, words.strip())
             self.reload()
 
     def _export_workflow(self) -> None:

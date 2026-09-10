@@ -29,8 +29,8 @@ from . import workflow as workflow_layer
 
 LOG = "log"
 REPORT = "report"
-HISTORY = "history"
-SUFFIX = {REPORT: ".md", HISTORY: ".md", LOG: ".jsonl"}
+JOURNAL = "journal"
+SUFFIX = {REPORT: ".md", JOURNAL: ".md"}
 def dump(data: dict) -> str:
     return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=200)
 
@@ -56,7 +56,9 @@ class Task:
         return self.data / "artifacts"
 
     def artifact(self, kind: str) -> Path:
-        """程序的三样记账：一类一目录（report / history / log），按任务名放。"""
+        """产物与流水各归其位：流水跟着任务走（tasks/<任务>.jsonl），产物按类型进 artifacts/。"""
+        if kind == LOG:
+            return self.file.with_suffix(".jsonl")
         return self.artifacts_dir / kind / f"{self.name}{SUFFIX[kind]}"
 
     def exists(self) -> bool:
@@ -110,14 +112,14 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     task = Task(root, Path(data), name)
     task.file.parent.mkdir(parents=True, exist_ok=True)
     task.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    for kind in (REPORT, HISTORY, LOG):
+    for kind in (REPORT, JOURNAL, LOG):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
         task.file.write_text(dump({"name": name, "workflow": workflow_name, "goal": about or "<这一次要什么，一句话>"}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
-    if not task.artifact(HISTORY).is_file():
-        task.artifact(HISTORY).write_text(records.history_template(name), encoding="utf-8")
+    if not task.artifact(JOURNAL).is_file():
+        task.artifact(JOURNAL).write_text(records.journal_template(name), encoding="utf-8")
     task.record("开工", about or f"跑工作流：{workflow_name}")
     return task
 
@@ -147,11 +149,11 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
 {criteria_text(step)}
 
-本任务的三样产物（报告 / 历史 / 流水，都是可维护的产物，不是程序的临时文件）：
+本任务的三样东西（报告与日志是产物，流水是执行痕迹）：
   报告：{task.relative(task.artifact(REPORT))}（程序只维护「执行记录」与「闸门项」两节，其余节归你写）
-  历史：{task.relative(task.artifact(HISTORY))}
+  日志：{task.relative(task.artifact(JOURNAL))}
   流水：{task.relative(task.artifact(LOG))}
-工作流里用 {{{{report}}}} / {{{{history}}}} / {{{{log}}}} 指这三样；产物内容写进报告，别动程序那两节。
+工作流里用 {{{{report}}}} / {{{{journal}}}} / {{{{log}}}} 指这三样；工作内容写进报告，别动程序那两节。
 规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """
 
@@ -216,7 +218,7 @@ def one_line(text: str, limit: int = 80) -> str:
     return line[:limit]
 
 
-PLACEHOLDER = re.compile(r"\{\{(?P<kind>report|history|log|artifacts)\}\}")
+PLACEHOLDER = re.compile(r"\{\{(?P<kind>report|journal|log|artifacts)\}\}")
 
 
 def expand(task: Task, value: str) -> str:
@@ -301,9 +303,9 @@ def replace_section(text: str, title: str, body: list[str]) -> str:
 
 
 def narrate(task: Task, words: str) -> None:
-    """历史只收叙事：一段一段往下写。"""
-    path = task.artifact(HISTORY)
-    text = path.read_text(encoding="utf-8") if path.is_file() else records.history_template(task.name)
+    """日志收叙事：一段一段往下写。"""
+    path = task.artifact(JOURNAL)
+    text = path.read_text(encoding="utf-8") if path.is_file() else records.journal_template(task.name)
     text = "\n".join(line for line in text.splitlines() if not (line.strip().startswith("（") and line.strip().endswith("）"))).rstrip()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"{text}\n\n{words.strip()}\n", encoding="utf-8")

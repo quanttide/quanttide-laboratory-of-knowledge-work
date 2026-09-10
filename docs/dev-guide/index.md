@@ -13,13 +13,13 @@ src/kg/
 ├── catalog.py   目录层：扫描成名字索引（收文件名与篇内标题）
 ├── checks.py    判据：结构化判据（机械带 spec / 闸门只有说明）的执行
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
-├── records.py   记录的段位与骨架：报告（执行记录 + 闸门项）、历史（叙事）
+├── records.py   记录的段位与骨架：报告（执行记录 + 闸门项）、日志（叙事）
 ├── workflow.py  工作流（YAML）：严格 schema（name / description / steps；步骤 name / description / executor / criteria；判据 executor: rule|agent|human）
 ├── task.py      任务（YAML）：工作流的一次执行（状态、走一步、流水、报告、历史）
 └── __main__.py  python3 -m kg
 
 tests/test_kg.py       自带测试，39 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
-data/                  所有数据（工作纪律），按领域模型分三家：workflows/ 定义、tasks/ 实例、artifacts/{report,history,log}/ 记账（按任务名）
+data/                  所有数据（工作纪律）：workflows/ 定义、tasks/（<任务>.yaml 指令 + <任务>.jsonl 流水）、artifacts/{report,journal}/ 产物（按任务名）
 kg / kg-gui            本目录下的启动器（不必安装）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```
