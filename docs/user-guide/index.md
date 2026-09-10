@@ -27,7 +27,7 @@ $ kg task --new 工具成形 --about "把动作串成一件在走的活"
 
 $ kg task 工具成形 --material data/journal/iGuo/2026-09-10.md
 记下材料：data/journal/iGuo/2026-09-10.md          # 四字段现填
-$ kg task 工具成形 --contract                       # 以记下的材料立指令
+$ kg task 工具成形 --instruction                  # 写出指令骨架（目标 / 步骤 / 验收）
 $ kg task 工具成形 --review                         # 跑机械核对，审查者报告写进报告
 $ kg task 工具成形 --output examples/default/src/kg/task.py
 $ kg task 工具成形 --decision "创始人 2026-09-10 通过"
