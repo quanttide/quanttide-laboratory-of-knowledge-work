@@ -19,19 +19,22 @@ steps:
     what: 把两边的源找齐
     executor: agent             # agent | human；默认 agent
     criteria:
-      - type: rule              # rule：程序跑下面的 spec
+      - type: rule              # rule：规则引擎按字段判（看什么 + 要什么）
         note: 个人课程档案在
-        spec: path:data/profile/iGuo/course/index.md
+        path: data/profile/iGuo/course/index.md
       - type: rule
         note: 课程研发档案在
-        spec: path:/home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
+        path: /home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
   - name: 核对
     what: 逐项对照，落成一件产物
     executor: human             # 要人做必须显式写
     criteria:
       - type: rule
         note: 产物落成
-        spec: path:examples/default/data/artifacts/课程档案比对/比对.md
+        path: examples/default/data/artifacts/课程档案比对/比对.md
+      - type: rule              # 文件含这段文字（file + contains 成对）
+        file: examples/default/data/artifacts/课程档案比对/比对.md
+        contains: "## 结论"
       - type: agent             # agent：智能体照 note 的判准审
         note: 两边口径是否对齐
       - type: human             # human：留给人拍板
@@ -42,13 +45,13 @@ steps:
 
 | type | 谁判 | 怎么判 |
 |---|---|---|
-| `rule` | 规则引擎（程序） | 跑 `spec`，四种写法：`` `path:` `` 存在、`` `absent:` `` 不存在、`` `contains:文件=文字` `` 含某段文字、`` `run:命令` `` 退出码为零；路径相对工作区根（绝对路径则按绝对路径，跨仓库核对用） |
+| `rule` | 规则引擎（程序） | 按**字段**判，四种判法：`path:` 存在 / `absent:` 不存在 / `file:` + `contains:` 文件含这段文字 / `run:` 命令退出码为零；路径相对工作区根（绝对路径则按绝对路径，跨仓库核对用）。`note` 可省——省了由程序按字段拼一句 |
 | `agent` | 智能体 | 程序把产物与 `note`（判准）交给 `pi -p`，要它逐条回答「通过 / 不通过 + 一句理由」 |
 | `human` | 人类 | 不跑，原样进报告的「闸门项」等人拍板 |
 
 **谁做**（`executor`）也是这两类：`agent`（默认）或 `human`。
 
-不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / what / executor / criteria`，判据只认 `type / note / spec`；`type` 只能三选一、`rule` 必须带 `spec`、`note` 不能空。不是「像不像」，是**合不合 schema**。
+不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / what / executor / criteria`，判据只认 `type / note / path / absent / file / contains / run`；`type` 只能三选一；`rule` 必须正好一种判法（`path`、`absent`、`file`+`contains`、`run` 四选一，且 `file`/`contains` 必须成对），`agent` / `human` 必须写 `note` 且不许带规则字段。不是「像不像」，是**合不合 schema**。
 
 **可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者与判据主体——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 

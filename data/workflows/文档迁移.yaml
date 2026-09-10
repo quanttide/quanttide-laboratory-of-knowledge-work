@@ -7,10 +7,10 @@ steps:
   criteria:
   - type: rule
     note: 目标侧文件已就位
-    spec: path:examples/default/docs/index.md
+    path: examples/default/docs/index.md
   - type: rule
     note: 源侧文件已删除
-    spec: absent:/home/iguo/repos/quanttide/default/quanttide-tech/apps/qtdata/examples/default/modules/default.md
+    absent: /home/iguo/repos/quanttide/default/quanttide-tech/apps/qtdata/examples/default/modules/default.md
   - type: human
     note: 落点与源位置同构（源在 examples/，目标也在实验室）
   - type: human

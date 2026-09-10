@@ -7,4 +7,5 @@ steps:
   criteria:
   - type: rule
     note: 问候落在
-    spec: contains:examples/default/data/artifacts/AI冒烟/问候.md=你好
+    file: examples/default/data/artifacts/AI冒烟/问候.md
+    contains: 你好

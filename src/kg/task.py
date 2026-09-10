@@ -160,7 +160,7 @@ def run_ai(prompt: str, root: Path, timeout: int = 900) -> tuple[bool, str]:
 
 
 def criteria_text(step: workflow_layer.Step) -> str:
-    lines = [f"- {criterion.get('type')}：{criterion.get('note')}" + (f"（{criterion['spec']}）" if criterion.get("spec") else "") for criterion in step.criteria]
+    lines = [f"- {criterion.get('type')}：{checks_layer.note_of(criterion) or criterion.get('note', '')}" for criterion in step.criteria]
     return "\n".join(lines) or "（这一步没有判据）"
 
 

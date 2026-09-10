@@ -15,7 +15,7 @@
       criteria:
         - type: rule
           note: 个人课程档案在
-          spec: path:data/profile/iGuo/course/index.md
+          path: data/profile/iGuo/course/index.md
         - type: human
           note: 创始人点头（回流与并法怎么定）
 """
@@ -31,7 +31,7 @@ EXECUTORS = (AGENT, HUMAN)
 TYPES = (RULE, AGENT, HUMAN)
 TOP_FIELDS = ("name", "description", "steps")
 STEP_FIELDS = ("name", "what", "executor", "criteria")
-CRITERION_FIELDS = ("type", "note", "spec")
+CRITERION_FIELDS = ("type", "note", "path", "absent", "file", "contains", "run")
 
 
 def lab_data() -> Path:
@@ -82,10 +82,23 @@ def load(path: Path) -> dict:
             odd = [key for key in criterion if key not in CRITERION_FIELDS]
             if odd:
                 raise WorkflowError(f"{Path(path).name} {where}有不认识的字段：{'、'.join(odd)}（只认 {'、'.join(CRITERION_FIELDS)}）")
-            if not str(criterion.get("note", "")).strip():
-                raise WorkflowError(f"{Path(path).name} {where}少了 note")
-            if criterion["type"] == RULE and not str(criterion.get("spec", "")).strip():
-                raise WorkflowError(f"{Path(path).name} {where}是 rule，必须带 spec")
+            kind = criterion["type"]
+            given = [name for name in ("path", "absent", "file", "contains", "run") if name in criterion]
+            if kind == RULE:
+                if not given:
+                    raise WorkflowError(f"{Path(path).name} {where}是 rule，得写一条判法（path / absent / file+contains / run）")
+                if "contains" in given and "file" not in given:
+                    raise WorkflowError(f"{Path(path).name} {where}写了 contains，还得写 file")
+                if "file" in given and "contains" not in given:
+                    raise WorkflowError(f"{Path(path).name} {where}写了 file，还得写 contains")
+                others = [name for name in given if name not in ("file", "contains")]
+                if len(others) > 1 or (others and "file" in given):
+                    raise WorkflowError(f"{Path(path).name} {where}的判法只能一种：path / absent / file+contains / run")
+            else:
+                if not str(criterion.get("note", "")).strip():
+                    raise WorkflowError(f"{Path(path).name} {where}是 {kind}，必须写 note（判准）")
+                if given:
+                    raise WorkflowError(f"{Path(path).name} {where}是 {kind}，不该带 {'、'.join(given)}（那是 rule 的字段）")
     return payload
 
 
@@ -177,7 +190,7 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
                 "what": f"<{step}这一步做什么>",
                 "executor": AGENT,
                 "criteria": [
-                    {"type": RULE, "note": "<能写成断言的>", "spec": "path:data/journal/README.md"},
+                    {"type": RULE, "path": "data/journal/README.md"},
                     {"type": HUMAN, "note": "<只能人拍板的>"},
                 ],
             }
