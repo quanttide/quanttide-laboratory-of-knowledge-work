@@ -1,17 +1,17 @@
-"""一件事：一个对象，从材料走到成果，中途发生的事落在它身上。
+"""任务：一个对象，从材料走到成果，中途发生的事落在它身上。
 
-案子目录（默认落在工作区的 cases/ 之下，可用 --cases 换地方）只是一件事的在飞部分；
+任务目录（默认落在工作区的 tasks/ 之下，可用 --cases 换地方）只是任务的在飞部分；
 它的记录按资产进对应的格子——**报告（事件）进 data/report/，历史（叙事）进 data/history/**：
 
-  cases/<名字>/            在飞的：要什么、记了哪些材料、契约、流水
-    ├── case.md
+  tasks/<名字>/            在飞的：要什么、记了哪些材料、契约、流水
+    ├── task.md
     ├── materials.md
     ├── contract.md
     └── log.jsonl
   data/report/<名字>.md    事件：生成者产出 / 审查者报告 / 人类裁决 / 最终成果（机器写）
-  data/history/<名字>.md   叙事：这件事的来龙去脉（人写）
+  data/history/<名字>.md   叙事：这个任务的来龙去脉（人写）
 
-动作都作用在这一件事上，事实自动记进流水与报告——不用手工把结果从这条命令搬到那条命令。
+动作都作用在这任务上，事实自动记进流水与报告——不用手工把结果从这条命令搬到那条命令。
 """
 
 import json
@@ -22,7 +22,7 @@ from pathlib import Path
 from . import records
 
 STAGES = ("材料", "契约", "核对", "产出", "裁决", "成果", "历史")
-CASE_FILE = "case.md"
+TASK_FILE = "task.md"
 MATERIALS = "materials.md"
 CONTRACT = "contract.md"
 LOG = "log.jsonl"
@@ -30,8 +30,13 @@ REPORT = "report"
 HISTORY = "history"
 
 
-def cases_root(root: Path, given: str | Path | None = None) -> Path:
-    return Path(given).expanduser().resolve() if given else root / "cases"
+def lab_data() -> Path:
+    """数据仓：实验室的 data/——工作纪律：所有数据放这里（见 AGENTS.md）。"""
+    return Path(__file__).resolve().parents[2] / "data"
+
+
+def tasks_root(data: Path, given: str | Path | None = None) -> Path:
+    return Path(given).expanduser().resolve() if given else Path(data) / "tasks"
 
 
 def now() -> str:
@@ -39,11 +44,12 @@ def now() -> str:
 
 
 @dataclass
-class Case:
-    """一件事：在飞的目录在工作区里，记录按资产进格。"""
+class Task:
+    """任务：在飞的目录在工作区里，记录按资产进格。"""
 
-    root: Path
-    dir: Path
+    root: Path  # 工作区：读材料、核契约
+    dir: Path  # 在飞的任务目录
+    data: Path  # 数据仓：报告与历史进这里
 
     @property
     def name(self) -> str:
@@ -53,11 +59,11 @@ class Case:
         return self.dir / name
 
     def record_file(self, kind: str) -> Path:
-        """记录落点：报告进 data/report，历史进 data/history。"""
-        return self.root / "data" / kind / f"{self.name}.md"
+        """记录落点：报告进 <数据仓>/report，历史进 <数据仓>/history。"""
+        return self.data / kind / f"{self.name}.md"
 
     def exists(self) -> bool:
-        return self.file(CASE_FILE).is_file()
+        return self.file(TASK_FILE).is_file()
 
     def text(self, name: str) -> str:
         path = self.file(name)
@@ -98,7 +104,7 @@ class Case:
             ("产出", "按契约做出来，记一笔产出"),
             ("裁决", "谁拍板、决定是什么"),
             ("成果", "收尾：把产出收束成成果，写进报告"),
-            ("历史", "写这件事的来龙去脉——报告记事，历史叙事"),
+            ("历史", "写这个任务的来龙去脉——报告记事，历史叙事"),
         ):
             if not state[action]:
                 return action, hint
@@ -136,87 +142,87 @@ class Case:
         self.fill_in(path, title, body + [item])
 
 
-def create(root: Path, name: str, cases: str | Path | None = None, about: str = "") -> Case:
-    """起一件事：在飞的目录建起来，报告与历史各进对应的格子。"""
-    case = Case(root, cases_root(root, cases) / name)
-    case.dir.mkdir(parents=True, exist_ok=True)
-    if not case.file(CASE_FILE).is_file():
-        case.write(CASE_FILE, f"# 一件事：{name}\n\n{about}\n" if about else f"# 一件事：{name}\n")
-    if not case.file(MATERIALS).is_file():
-        case.write(MATERIALS, "# 材料\n")
-    report, history = case.record_file(REPORT), case.record_file(HISTORY)
+def create(root: Path, name: str, data: Path, cases: str | Path | None = None, about: str = "") -> Task:
+    """起任务：在飞的目录建起来，报告与历史各进对应的格子。"""
+    task = Task(root, tasks_root(data, cases) / name, Path(data))
+    task.dir.mkdir(parents=True, exist_ok=True)
+    if not task.file(TASK_FILE).is_file():
+        task.write(TASK_FILE, records.task_template(name, about))
+    if not task.file(MATERIALS).is_file():
+        task.write(MATERIALS, "# 材料\n")
+    report, history = task.record_file(REPORT), task.record_file(HISTORY)
     for path, text in ((report, records.report_template(name)), (history, records.history_template(name))):
         if not path.is_file():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
-    case.record("起案", about or name)
-    return case
+    task.record("开工", about or name)
+    return task
 
 
-def open_case(root: Path, name: str, cases: str | Path | None = None) -> Case:
-    return Case(root, cases_root(root, cases) / name)
+def open_task(root: Path, name: str, data: Path, cases: str | Path | None = None) -> Task:
+    return Task(root, tasks_root(data, cases) / name, Path(data))
 
 
-def listing(root: Path, cases: str | Path | None = None) -> list[Case]:
-    base = cases_root(root, cases)
-    return [Case(root, child) for child in sorted(base.iterdir()) if (child / CASE_FILE).is_file()] if base.is_dir() else []
+def listing(root: Path, data: Path, cases: str | Path | None = None) -> list[Task]:
+    base = tasks_root(data, cases)
+    return [Task(root, child, Path(data)) for child in sorted(base.iterdir()) if (child / TASK_FILE).is_file()] if base.is_dir() else []
 
 
 # ---- 动作：每一步都留下痕迹 ----
 
 
-def add_material(case: Case, rel: str, fields: str) -> None:
-    case.append(MATERIALS, f"`{rel}`　{fields}　（{now()}）")
-    case.record("材料", rel)
+def add_material(task: Task, rel: str, fields: str) -> None:
+    task.append(MATERIALS, f"`{rel}`　{fields}　（{now()}）")
+    task.record("材料", rel)
 
 
-def write_contract(case: Case, about: str) -> None:
-    case.write(CONTRACT, records.contract_template(about))
-    case.record("契约", f"以 {about} 为题" if about else "写契约")
+def write_contract(task: Task, about: str) -> None:
+    task.write(CONTRACT, records.contract_template(about))
+    task.record("契约", f"以 {about} 为题" if about else "写契约")
 
 
-def review(case: Case, root: Path) -> tuple[bool, list[str]]:
+def review(task: Task, root: Path) -> tuple[bool, list[str]]:
     """跑契约的机械核对，结果写进报告的审查者报告，并记流水。"""
     from . import report
 
-    if not case.file(CONTRACT).is_file():
+    if not task.file(CONTRACT).is_file():
         return False, ["还没有契约"]
-    result = report.audit_contract(root, case.file(CONTRACT))
+    result = report.audit_contract(root, task.file(CONTRACT))
     body = [f"{'✓' if mark == '✓' else '✗'} {note}" for note, mark, _ in result.rows if mark != "闸门"]
     body += [f"⧗ {note}（留给闸门）" for note, mark, _ in result.rows if mark == "闸门"]
-    case.fill_in(case.record_file(REPORT), "审查者报告", body)
-    case.record("核对", f"机械核对 {len(result.rows)} 项", ok=result.ok)
+    task.fill_in(task.record_file(REPORT), "审查者报告", body)
+    task.record("核对", f"机械核对 {len(result.rows)} 项", ok=result.ok)
     return result.ok, result.lines
 
 
-def add_output(case: Case, rel: str) -> None:
-    case.append_in(case.record_file(REPORT), "生成者产出", f"`{rel}`　（{now()}）")
-    case.record("产出", rel)
+def add_output(task: Task, rel: str) -> None:
+    task.append_in(task.record_file(REPORT), "生成者产出", f"`{rel}`　（{now()}）")
+    task.record("产出", rel)
 
 
-def decide(case: Case, words: str) -> None:
-    case.fill_in(case.record_file(REPORT), "人类裁决", [words])
-    case.record("裁决", words)
+def decide(task: Task, words: str) -> None:
+    task.fill_in(task.record_file(REPORT), "人类裁决", [words])
+    task.record("裁决", words)
 
 
-def finish(case: Case) -> list[str]:
+def finish(task: Task) -> list[str]:
     """收尾：把生成者产出收束成最终成果。"""
-    body = case.report().get("生成者产出", [])
-    case.fill_in(case.record_file(REPORT), "最终成果", body or ["（没有产出可收）"])
-    case.record("成果", f"{len(body)} 项")
+    body = task.report().get("生成者产出", [])
+    task.fill_in(task.record_file(REPORT), "最终成果", body or ["（没有产出可收）"])
+    task.record("成果", f"{len(body)} 项")
     return body
 
 
-def narrate(case: Case, words: str) -> None:
+def narrate(task: Task, words: str) -> None:
     """历史只收叙事：一段一段往下写。"""
-    path = case.record_file(HISTORY)
-    text = path.read_text(encoding="utf-8") if path.is_file() else records.history_template(case.name)
-    text = text.replace(records.HISTORY_PLACEHOLDER, "").rstrip()
+    path = task.record_file(HISTORY)
+    text = path.read_text(encoding="utf-8") if path.is_file() else records.history_template(task.name)
+    text = "\n".join(line for line in text.splitlines() if not (line.strip().startswith("（") and line.strip().endswith("）"))).rstrip()
     path.write_text(f"{text}\n\n{words.strip()}\n", encoding="utf-8")
-    case.record("历史", words.strip()[:40])
+    task.record("历史", words.strip()[:40])
 
 
-def state_line(case: Case) -> str:
+def state_line(task: Task) -> str:
     """给界面用的一句人话。"""
-    action, hint = case.next_action()
+    action, hint = task.next_action()
     return hint if action == "完成" else f"下一步：{action}——{hint}"

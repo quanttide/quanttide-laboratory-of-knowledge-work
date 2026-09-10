@@ -19,7 +19,7 @@ from kg import assets as assets_layer  # noqa: E402
 from kg import catalog as catalog_layer  # noqa: E402
 from kg import checks as checks_layer  # noqa: E402
 from kg import cli, material as material_layer  # noqa: E402
-from kg import case as case_layer  # noqa: E402
+from kg import task as task_layer  # noqa: E402
 from kg import records  # noqa: E402
 from kg import report  # noqa: E402
 
@@ -55,9 +55,9 @@ def with_repo(root: Path) -> None:
     subprocess.run(["git", "commit", "-q", "--amend", "--date=2026-09-10T09:00:00", "--no-edit"], cwd=root, check=True, capture_output=True)
 
 
-def case_file(path: Path, material: str = "", contract: str = "", output: str = "") -> Path:
-    """写一份一件事的文件，哪一段要填就填。"""
-    body = ["# 一件事：试一条路", ""]
+def task_file(path: Path, material: str = "", contract: str = "", output: str = "") -> Path:
+    """写一份任务的文件，哪一段要填就填。"""
+    body = ["# 任务：试一条路", ""]
     for name, item in (("材料", material), ("契约", contract), ("产出", output), ("案卷", "")):
         body += [f"## {name}", ""]
         if item:
@@ -68,10 +68,10 @@ def case_file(path: Path, material: str = "", contract: str = "", output: str = 
 
 
 def links(real: Path) -> None:
-    """动作之间的四条链接：立契约、写案卷、补格子、串成一件事。"""
+    """动作之间的四条链接：立契约、写案卷、补格子、串成任务。"""
     with tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "报告.md"
-        result = report.audit_contract(real, LAB / "samples" / "migration.md", into=target)
+        result = report.audit_contract(real, LAB / "data" / "samples" / "migration.md", into=target)
         text = target.read_text(encoding="utf-8") if target.is_file() else ""
         test("链接①：核对契约把审查者报告写进报告", result.ok and "## 审查者报告" in text and "✓ 机械：目标侧文件已就位" in text)
         test("链接①：写出来的报告自查通过", report.audit_report(target).ok)
@@ -91,27 +91,26 @@ def links(real: Path) -> None:
         test("链接②：独立仓库那三格不凭空建", left == set(assets_layer.LOCATION), f"剩 {sorted(left)}")
 
     with tempfile.TemporaryDirectory() as tmp:
-        root = fake_repo(Path(tmp) / "case")
+        root = fake_repo(Path(tmp) / "task")
         (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
         (root / "产出.md").write_text("# 产出\n", encoding="utf-8")
-        cases = str(Path(tmp) / "cases")
-        report.case_new(root, "试一条路", cases, "把动作串起来")
-        start_state = report.case_status(root, "试一条路", cases)
-        test("主轴：起案时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
-        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这件事。"))
+        data = Path(tmp) / "data"
+        report.task_new(root, "试一条路", data, None, "把动作串起来")
+        start_state = report.task_status(root, "试一条路", data)
+        test("主轴：开工时六格全空", all(row[1] == "—" for row in start_state.rows), str(start_state.rows))
+        walk = (("material", "data/journal/2026-09-10.md"), ("contract", ""), ("review", ""), ("output", "产出.md"), ("decision", "通过"), ("finish", ""), ("history", "先接接口不够，主界面得是这个任务。"))
         marks = []
         for action, given in walk:
-            step = report.case_step(root, "试一条路", action, given, cases)
+            step = report.task_step(root, "试一条路", action, given, data)
             marks.append([row[1] for row in step.rows].count("✓"))
         test("主轴：七步顺次点亮", marks == [1, 2, 3, 4, 5, 6, 7], f"实得 {marks}")
-        case = case_layer.open_case(root, "试一条路", cases)
-        test("主轴：流水记满八条", len(case.events()) == 8, f"实得 {len(case.events())}")
-        test("主轴：报告四段都是真的", all(case.report().get(name) for name in records.REPORT_SECTIONS), str(case.report().keys()))
-        test("主轴：报告进 data/report、历史进 data/history", case.record_file("report").is_relative_to(root / "data" / "report") and records.prose(case.record_file("history")) != "")
-        test("主轴：这两格审计认得", "未登记" not in "".join(report.audit(root).lines) or "report" not in "".join(report.audit(root).lines))
-        test("主轴：认不得的步骤挡住", not report.case_step(root, "试一条路", "乱来", "", cases).ok)
-        test("主轴：列案子报下一步", report.case_list(root, cases).rows[0][1] == "完成")
-        test("主轴：案子进得了目录", "试一条路" in "".join(row[0] for row in report.case_list(root, cases).rows))
+        task = task_layer.open_task(root, "试一条路", data)
+        test("主轴：流水记满八条", len(task.events()) == 8, f"实得 {len(task.events())}")
+        test("主轴：报告四段都是真的", all(task.report().get(name) for name in records.REPORT_SECTIONS), str(task.report().keys()))
+        test("主轴：数据全落在数据仓里", task.record_file("report").is_relative_to(data / "report") and task.record_file("history").is_relative_to(data / "history") and task.dir.is_relative_to(data / "tasks"), str(task.record_file("report")))
+        test("主轴：历史是叙事", records.prose(task.record_file("history")) != "")
+        test("主轴：认不得的步骤挡住", not report.task_step(root, "试一条路", "乱来", "", data).ok)
+        test("主轴：列任务报下一步", report.task_list(root, data).rows[0][1] == "完成")
 
 
 def gui_smoke(real: Path) -> None:
@@ -132,7 +131,7 @@ def gui_smoke(real: Path) -> None:
     browser.select_action("审计")
     test("界面：审计通过", browser.run_current().ok)
     browser.select_action("核对契约")
-    browser.widgets["契约文件"].setText(str(LAB / "samples" / "migration.md"))
+    browser.widgets["契约文件"].setText(str(LAB / "data" / "samples" / "migration.md"))
     audit = browser.run_current()
     test("界面：核对真实契约", audit.ok and len(audit.rows) >= 4, f"行 {len(audit.rows)}")
     browser.select_action("目录")
@@ -148,12 +147,12 @@ def gui_smoke(real: Path) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         fake = fake_repo(Path(tmp) / "desk")
         (fake / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
-        cases = str(Path(tmp) / "cases")
-        desk = gui.Desk(fake, Path(cases))
-        test("台面：没有案子时提示起一件", "新建" in desk.next_label.text())
-        case_layer.create(fake, "试一条路", cases, "把动作串起来")
+        data = Path(tmp) / "data"
+        desk = gui.Desk(fake, data)
+        test("台面：没有任务时提示起一件", "新建" in desk.next_label.text())
+        task_layer.create(fake, "试一条路", data, None, "把动作串起来")
         desk.reload()
-        report.case_step(fake, "试一条路", "material", "data/journal/2026-09-10.md", cases)
+        report.task_step(fake, "试一条路", "material", "data/journal/2026-09-10.md", data)
         desk.reload()
         test("台面：状态表跟着走", desk.state_table.item(0, 1).text() == "✓" and desk.state_table.item(1, 1).text() == "—")
         test("台面：流水表有记录", desk.log_table.rowCount() >= 2, f"{desk.log_table.rowCount()} 行")

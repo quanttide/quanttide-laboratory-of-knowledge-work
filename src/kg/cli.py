@@ -16,18 +16,19 @@
   kg new-report <文件> [--about 标题]     写报告骨架（事件）
   kg audit-report <文件>         核对报告——段位齐全
 
-一件事（对象在盘上，动作作用在它身上，事实自动记进流水）
-  kg case --list                 有哪些事、各自下一步
-  kg case --new <名字>           起一件事
-  kg case <名字>                 看这件事的七格状态与流水
-  kg case <名字> --material <路径>   记一条材料（类型 / 阶段 / 时间 / 来源现填）
-  kg case <名字> --contract       以记下的材料立契约
-  kg case <名字> --review         跑机械核对，审查者报告写进报告
-  kg case <名字> --output <路径>     记一笔产出
-  kg case <名字> --decision <话>     写下裁决
-  kg case <名字> --finish         收尾：产出收束成成果，写进报告
-  kg case <名字> --history <一段话>   写下这件事的来龙去脉（历史：叙事）
-  （案子默认落在 <工作区>/cases/，用 --cases 换地方）
+任务（过程的一次执行实例：有指令、有状态，直到交付工件）
+  kg task --list                 有哪些事、各自下一步
+  kg task --new <名字>           起任务
+  kg task <名字>                 看这个任务的七格状态与流水
+  kg task <名字> --material <路径>   记一条材料（类型 / 阶段 / 时间 / 来源现填）
+  kg task <名字> --contract       以记下的材料立契约
+  kg task <名字> --review         跑机械核对，审查者报告写进报告
+  kg task <名字> --output <路径>     记一笔产出
+  kg task <名字> --decision <话>     写下裁决
+  kg task <名字> --finish         收尾：产出收束成成果，写进报告
+  kg task <名字> --history <一段话>   写下这个任务的来龙去脉（历史：叙事）
+  （数据默认落在实验室的 data/：报告进 report/、历史进 history/、在飞的任务进 tasks/）
+  kg gui --data <目录>           换数据仓；--tasks 单独换任务目录
 
   kg gui                         开图形界面（同一个程序的窗口版）
 
@@ -39,6 +40,7 @@ import sys
 from pathlib import Path
 
 from . import assets as assets_layer
+from . import task as task_layer
 from . import catalog as catalog_layer
 from . import report
 
@@ -89,18 +91,19 @@ def cmd_audit_contract(root: Path, args) -> int:
     return emit(report.audit_contract(root, Path(args.target), Path(args.into) if args.into else None))
 
 
-def cmd_case(root: Path, args) -> int:
+def cmd_task(root: Path, args) -> int:
+    data = Path(args.data)
     if args.list:
-        return emit(report.case_list(root, args.cases))
+        return emit(report.task_list(root, data, args.tasks))
     if args.new:
-        return emit(report.case_new(root, args.name or "", args.cases, args.about))
+        return emit(report.task_new(root, args.name or "", data, args.tasks, args.about))
     if not args.name:
-        return emit(report.Result(ok=False, lines=["用法：kg case <名字>，或 kg case --list / --new <名字>"]))
+        return emit(report.Result(ok=False, lines=["用法：kg task <名字>，或 kg task --list / --new <名字>"]))
     for action in ("material", "contract", "review", "output", "decision", "finish", "history"):
         if getattr(args, action):
             value = value_of(args, action)
-            return emit(report.case_step(root, args.name, action, value, args.cases))
-    return emit(report.case_status(root, args.name, args.cases))
+            return emit(report.task_step(root, args.name, action, value, data, args.tasks))
+    return emit(report.task_status(root, args.name, data, args.tasks))
 
 
 def value_of(args, action: str) -> str:
@@ -133,6 +136,7 @@ def cmd_gui(root: Path, args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kg", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
+    parser.add_argument("--data", default=str(task_layer.lab_data()), help="数据仓（默认实验室 data/）")
     sub = parser.add_subparsers(dest="action", required=True)
 
     find = sub.add_parser("find", help="按名找文档")
@@ -160,19 +164,19 @@ def build_parser() -> argparse.ArgumentParser:
     checking.add_argument("target", metavar="文件")
     checking.add_argument("--into", metavar="报告", help="把审查者报告写进这份报告")
     sub.add_parser("audit-report", help="核对报告").add_argument("target", metavar="文件")
-    case = sub.add_parser("case", help="一件事：起、看、走一步")
-    case.add_argument("name", nargs="?", metavar="名字")
-    case.add_argument("--list", action="store_true", help="有哪些事、各自下一步")
-    case.add_argument("--new", action="store_true", help="起一件事")
-    case.add_argument("--about", default="", metavar="一句话", help="起案时的一句话，或立契约时以哪件东西为题")
-    case.add_argument("--cases", metavar="目录", help="案子放哪（默认 工作区/cases）")
-    case.add_argument("--material", nargs="?", const=True, metavar="路径")
-    case.add_argument("--contract", nargs="?", const=True, metavar="以它为题的路径")
-    case.add_argument("--review", action="store_true")
-    case.add_argument("--output", nargs="?", const=True, metavar="路径")
-    case.add_argument("--decision", nargs="?", const=True, metavar="一句话")
-    case.add_argument("--finish", action="store_true")
-    case.add_argument("--history", nargs="?", const=True, metavar="一段话")
+    task = sub.add_parser("task", help="任务：起、看、走一步")
+    task.add_argument("name", nargs="?", metavar="名字")
+    task.add_argument("--list", action="store_true", help="有哪些事、各自下一步")
+    task.add_argument("--new", action="store_true", help="起任务")
+    task.add_argument("--about", default="", metavar="一句话", help="开工时的一句话，或立契约时以哪件东西为题")
+    task.add_argument("--tasks", metavar="目录", help="任务放哪（默认 <数据仓>/tasks）")
+    task.add_argument("--material", nargs="?", const=True, metavar="路径")
+    task.add_argument("--contract", nargs="?", const=True, metavar="以它为题的路径")
+    task.add_argument("--review", action="store_true")
+    task.add_argument("--output", nargs="?", const=True, metavar="路径")
+    task.add_argument("--decision", nargs="?", const=True, metavar="一句话")
+    task.add_argument("--finish", action="store_true")
+    task.add_argument("--history", nargs="?", const=True, metavar="一段话")
     sub.add_parser("gui", help="开图形界面")
     return parser
 
@@ -186,7 +190,7 @@ HANDLERS = {
     "new-report": cmd_new_report,
     "audit-contract": cmd_audit_contract,
     "audit-report": cmd_audit_report,
-    "case": cmd_case,
+    "task": cmd_task,
     "gui": cmd_gui,
 }
 

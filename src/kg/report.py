@@ -4,7 +4,7 @@
 `columns`/`rows` 是界面要画的同一份表格。界面只管画，命令行只管印，
 算法只在这里写一遍。
 
-几个动作之间有接口，一件事就是这么串起来的：
+几个动作之间有接口，任务就是这么串起来的：
   材料（输入）→ 以它立契约 → 核对契约（审查者报告）→ 写进案卷 → 成果登记回工作区。
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from . import assets as assets_layer
 from . import catalog as catalog_layer
-from . import case as case_layer
+from . import task as task_layer
 from . import checks as checks_layer
 from . import material as material_layer
 from . import records
@@ -218,55 +218,56 @@ def audit_report(target: Path) -> Result:
     return result
 
 
-# ---- 主轴：一件事 ----
+# ---- 主轴：任务 ----
 
 STEP_COLUMNS = ("段", "状态")
 
 
-def case_new(root: Path, name: str, cases: str | None = None, about: str = "") -> Result:
+def task_new(root: Path, name: str, data: Path, tasks: str | None = None, about: str = "") -> Result:
     if not name.strip():
-        return Result(ok=False, lines=["请先给这件事起个名字"])
-    case = case_layer.create(root, name.strip(), cases, about)
-    return Result(lines=[f"起了：{case.dir}", case_layer.state_line(case)])
+        return Result(ok=False, lines=["请先给这个任务起个名字"])
+    task = task_layer.create(root, name.strip(), data, tasks, about)
+    return Result(lines=[f"起了：{task.dir}", task_layer.state_line(task)])
 
 
-def case_status(root: Path, name: str, cases: str | None = None) -> Result:
+def task_status(root: Path, name: str, data: Path, tasks: str | None = None) -> Result:
     if not name.strip():
-        return Result(ok=False, lines=["请先选一件事（kg case --list 看有哪些）"])
-    case = case_layer.open_case(root, name, cases)
-    if not case.exists():
-        return Result(ok=False, lines=[f"没有这件事：{case.dir}"])
-    state = case.stages()
+        return Result(ok=False, lines=["请先选任务（kg task --list 看有哪些）"])
+    task = task_layer.open_task(root, name, data, tasks)
+    if not task.exists():
+        return Result(ok=False, lines=[f"没有这个任务：{task.dir}"])
+    state = task.stages()
     result = Result(columns=STEP_COLUMNS)
-    result.rows = [(stage, "✓" if state[stage] else "—") for stage in case_layer.STAGES]
-    result.lines = [f"一件事：{case.name}（{case.dir}）"]
-    result.lines += [f"  {'✓' if state[s] else '—'} {s}" for s in case_layer.STAGES]
-    result.lines.append(case_layer.state_line(case))
-    result.lines.append(f"报告：{short(root, case.record_file(case_layer.REPORT))}　历史：{short(root, case.record_file(case_layer.HISTORY))}")
-    events = case.events()[-5:]
+    result.rows = [(stage, "✓" if state[stage] else "—") for stage in task_layer.STAGES]
+    result.lines = [f"任务：{task.name}（{task.dir}）"]
+    result.lines += [f"  {'✓' if state[s] else '—'} {s}" for s in task_layer.STAGES]
+    result.lines.append(task_layer.state_line(task))
+    result.lines.append(f"报告：{short(root, task.record_file(task_layer.REPORT))}　历史：{short(root, task.record_file(task_layer.HISTORY))}")
+    events = task.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")
         result.lines += [f"  {e['at']}　{e['kind']}　{e['detail']}" for e in events]
     return result
 
 
-def case_list(root: Path, cases: str | None = None) -> Result:
-    found = case_layer.listing(root, cases)
-    result = Result(columns=("一件事", "下一步", "位置"))
-    for case in found:
-        action, _ = case.next_action()
-        result.rows.append((case.name, action, short(root, case.dir)))
-        result.lines.append(f"{case.name:24} 下一步：{action}")
+def task_list(root: Path, data: Path, tasks: str | None = None) -> Result:
+    found = task_layer.listing(root, data, tasks)
+    result = Result(columns=("任务", "下一步", "位置"))
+    for task in found:
+        action, _ = task.next_action()
+        result.rows.append((task.name, action, short(root, task.dir)))
+        result.lines.append(f"{task.name:24} 下一步：{action}")
     if not found:
-        result.lines = ["还没有一件事：kg case --new <名字>"]
+        result.lines = ["还没有任务：kg task --new <名字>"]
     return result
 
 
-def case_step(root: Path, name: str, action: str, value: str = "", cases: str | None = None) -> Result:
-    """在一件事上走一步；事实自动记进它的流水。"""
-    case = case_layer.open_case(root, name, cases)
-    if not case.exists():
-        return Result(ok=False, lines=[f"没有这件事：{case.dir}"])
+def task_step(root: Path, name: str, action: str, value: str = "", data: Path | None = None, tasks: str | None = None) -> Result:
+    """在任务上走一步；事实自动记进它的流水。"""
+    data = data or task_layer.lab_data()
+    task = task_layer.open_task(root, name, data, tasks)
+    if not task.exists():
+        return Result(ok=False, lines=[f"没有这个任务：{task.dir}"])
 
     if action == "material":
         if not value.strip():
@@ -277,40 +278,40 @@ def case_step(root: Path, name: str, action: str, value: str = "", cases: str | 
         mat = material_layer.as_material(root, path)
         rel = short(root, path)
         fields = f"{mat.type} / {mat.stage} / {mat.created_at or '（缺时间）'} / {mat.source}"
-        case_layer.add_material(case, rel, fields)
+        task_layer.add_material(task, rel, fields)
         message = f"记下材料：{rel}"
     elif action == "contract":
-        about = value.strip() or (case.items(case_layer.MATERIALS)[0].split("　")[0].strip("`") if case.items(case_layer.MATERIALS) else "")
-        case_layer.write_contract(case, about)
-        message = f"写好契约：{short(root, case.file(case_layer.CONTRACT))}" + (f"（以 {about} 为题）" if about else "")
+        about = value.strip() or (task.items(task_layer.MATERIALS)[0].split("　")[0].strip("`") if task.items(task_layer.MATERIALS) else "")
+        task_layer.write_contract(task, about)
+        message = f"写好契约：{short(root, task.file(task_layer.CONTRACT))}" + (f"（以 {about} 为题）" if about else "")
     elif action == "review":
-        ok, lines = case_layer.review(case, root)
-        message = f"核对完了，审查者报告已写进 {short(root, case.record_file(case_layer.REPORT))}" if ok else "核对没过：" + "；".join(lines[:2])
-        case_after = case_status(root, name, cases)
-        case_after.lines.insert(0, message)
-        return case_after
+        ok, lines = task_layer.review(task, root)
+        message = f"核对完了，审查者报告已写进 {short(root, task.record_file(task_layer.REPORT))}" if ok else "核对没过：" + "；".join(lines[:2])
+        task_after = task_status(root, name, data, tasks)
+        task_after.lines.insert(0, message)
+        return task_after
     elif action == "output":
         if not value.strip():
             return Result(ok=False, lines=["请给产出一个路径"])
         path = here(root, value.strip())
-        case_layer.add_output(case, short(root, path))
+        task_layer.add_output(task, short(root, path))
         message = f"记下产出：{short(root, path)}"
     elif action == "decision":
         if not value.strip():
             return Result(ok=False, lines=["裁决得写句话：谁拍的板、决定是什么"])
-        case_layer.decide(case, value.strip())
+        task_layer.decide(task, value.strip())
         message = "裁决已记入报告"
     elif action == "finish":
-        items = case_layer.finish(case)
+        items = task_layer.finish(task)
         message = f"成果已收束进报告：{len(items)} 项"
     elif action == "history":
         if not value.strip():
-            return Result(ok=False, lines=[f"历史要你来写：{short(root, case.record_file(case_layer.HISTORY))}"])
-        case_layer.narrate(case, value)
-        message = f"历史记下一段：{short(root, case.record_file(case_layer.HISTORY))}"
+            return Result(ok=False, lines=[f"历史要你来写：{short(root, task.record_file(task_layer.HISTORY))}"])
+        task_layer.narrate(task, value)
+        message = f"历史记下一段：{short(root, task.record_file(task_layer.HISTORY))}"
     else:
         return Result(ok=False, lines=[f"不认得这一步：{action}"])
 
-    state = case_status(root, name, cases)
+    state = task_status(root, name, data, tasks)
     state.lines.insert(0, message)
     return state
