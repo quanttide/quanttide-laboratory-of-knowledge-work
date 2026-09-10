@@ -222,14 +222,19 @@ def task_list(root: Path, data: Path) -> Result:
     return result
 
 
-def task_step(root: Path, data: Path, name: str, step: str, note: str = "") -> Result:
-    """走一步：做这一步的验收判据，记账。"""
+def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "", auto: bool = False) -> Result:
+    """走一步：能让 AI 跑的交给 AI（auto），然后跑判据、记账。"""
     task = task_layer.open_task(root, data, name)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not step.strip():
-        return Result(ok=False, lines=["请给步骤名（kg task <名字> 看有哪些步骤）"])
-    ok, lines, rows = task_layer.execute(task, root, step.strip(), note)
+        if not auto:
+            return Result(ok=False, lines=["请给步骤名（kg task <名字> 看有哪些步骤）"])
+        nxt = task.next_step()
+        if nxt is None:
+            return Result(lines=["所有步骤都走过了"])
+        step = nxt.name
+    ok, lines, rows = task_layer.execute(task, root, step.strip(), note, auto=auto)
     result = Result(ok=ok, lines=lines, columns=MECHANICAL, rows=rows)
     result.lines.append(task_layer.state_line(task))
     return result

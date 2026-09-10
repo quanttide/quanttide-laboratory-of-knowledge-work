@@ -11,8 +11,8 @@
   - [ ] 机械：…在 `path:…`
   - [ ] 闸门：…
 
-每个步骤自带它的验收判据（机械的当场判，闸门的留给人）。工作流只管编排与判据，
-执行是任务的事——同一个工作流可以被执行很多次。
+每个步骤自带执行者与验收判据：**默认交给 AI 跑**（`pi -p`），要人做的步骤显式写 `- 执行者：人`；
+判据里机械的当场判、闸门的留给人。工作流只管编排与判据，执行是任务的事——同一个工作流可被多次执行。
 """
 
 import re
@@ -27,12 +27,37 @@ def lab_data() -> Path:
     return Path(__file__).resolve().parents[2] / "data"
 
 
+AI = "AI"
+HUMAN = "人"
+EXECUTOR = re.compile(r"^-\s*执行者[：:]\s*(.+?)\s*$")
+
+
 @dataclass(frozen=True)
 class Step:
-    """一个工作步骤：叫什么、做什么、怎么算完（判据原文由 checks 去解）。"""
+    """一个工作步骤：叫什么、做什么、谁执行、怎么算完。
+
+    默认交给 AI 跑；要人做的步骤必须显式写「- 执行者：人」。
+    """
 
     name: str
     text: str
+
+    @property
+    def executor(self) -> str:
+        for line in self.text.splitlines():
+            if match := EXECUTOR.match(line.strip()):
+                return match.group(1).strip()
+        return AI
+
+    @property
+    def human(self) -> bool:
+        return self.executor not in (AI, "ai", "AI 执行")
+
+    @property
+    def what(self) -> str:
+        """做什么：判据行与执行者行之外的正文。"""
+        keep = [line for line in self.text.splitlines() if not line.strip().startswith("- [") and not EXECUTOR.match(line.strip())]
+        return "\n".join(keep).strip()
 
     @property
     def judges(self) -> str:
@@ -76,7 +101,15 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
     flow.file.parent.mkdir(parents=True, exist_ok=True)
     body = [f"# 工作流：{name}", "", note or "步骤串联：写清每步做什么、怎么算完。", "", "## 步骤", ""]
     for step in steps:
-        body += [f"### {step}", "", f"- 做什么：<{step}这一步做什么>", "- [ ] 机械：<能写成断言的> `path:data/journal/README.md`", "- [ ] 闸门：<只能人拍板的>", ""]
+        body += [
+            f"### {step}",
+            "",
+            f"- 做什么：<{step}这一步做什么>",
+            f"- 执行者：{AI}",
+            "- [ ] 机械：<能写成断言的> `path:data/journal/README.md`",
+            "- [ ] 闸门：<只能人拍板的>",
+            "",
+        ]
     flow.file.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8")
     return flow
 

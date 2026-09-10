@@ -26,7 +26,8 @@ uv venv .venv && uv pip install -e ".[gui]"
 | `kg workflow <名字>` / `--list` | 看步骤与判据 / 有哪些工作流 |
 | `kg task --new <名字> --workflow <工作流> [--about …]` | 起一件任务（工作流的一次执行） |
 | `kg task <名字>` / `--list` | 看步骤状态与流水 / 有哪些任务 |
-| `kg task <名字> --done <步骤> [--note 一句话]` | 走这一步：跑它的验收判据、记账、写报告 |
+| `kg task <名字> --next` | 走下一步：执行者是 AI 的交给 `pi -p` 跑，然后**程序自己**核对判据、记账 |
+| `kg task <名字> --done <步骤> [--note 一句话]` | 人做的那一步，记一笔 |
 | `kg task <名字> --history <一段话>` | 历史：写下这一次的来龙去脉（叙事） |
 | `kg find <名字>` | 按名找文档——认文件名与中文标题 |
 | `kg catalog` | 看目录——列全部条目，可导 JSON |

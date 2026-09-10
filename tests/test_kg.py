@@ -138,20 +138,42 @@ def flow_and_task(real: Path) -> None:
         text = text.replace("""### 比对
 
 - 做什么：<比对这一步做什么>
+- 执行者：AI
 - [ ] 机械：<能写成断言的> `path:data/journal/README.md`
 - [ ] 闸门：<只能人拍板的>""", """### 比对
 
 - 做什么：把两边比一遍
+- 执行者：AI
 - [ ] 机械：日志在 `path:data/journal/README.md`
 - [ ] 闸门：创始人过目""")
         flow.file.write_text(text, encoding="utf-8")
+
+        # 把「写给 AI 跑」的那一环换掉：测试里不真调 pi
+        real_ai = task_layer.run_ai
+        calls: list[str] = []
+
+        def fake_ai(prompt: str, where: Path, timeout: int = 900) -> tuple[bool, str]:
+            calls.append(prompt)
+            return True, "我把这一步做完了"
+
+        task_layer.run_ai = fake_ai
 
         started = report.task_new(root, data, "试一次", "试一条", "把纪律落下来")
         task = task_layer.open_task(root, data, "试一次")
         test("任务：一件任务一个文件，指向工作流", task.file.is_file() and task.workflow_name() == "试一条", task.workflow_name())
         test("任务：状态按工作流列步骤", [row[0] for row in started.rows] == ["定位", "比对", "结论"])
         test("任务：起时记一笔", len(task.events()) == 1)
-        test("任务：没有判据的步骤（占位不算）直接能记", report.task_step(root, data, "试一次", "定位", "两边都找到了").ok)
+        auto = report.task_step(root, data, "试一次", "", auto=True)  # 默认执行者是 AI，交给 pi
+        test("走一步：默认交给 AI 跑", bool(calls) and "这一步：定位" in calls[0], str(calls[:1])[:60])
+        test("走一步：AI 干活也记一笔", any("AI 执行" in e["detail"] for e in task.events()), str(task.events()[-1:]))
+
+        # 标了「执行者：人」的步骤，程序不抢着做
+        text = flow.file.read_text(encoding="utf-8")
+        flow.file.write_text(text.replace("### 比对\n\n- 做什么：把两边比一遍", "### 比对\n\n- 做什么：把两边比一遍\n- 执行者：人"), encoding="utf-8")
+        calls.clear()
+        human = report.task_step(root, data, "试一次", "", auto=True)
+        test("走一步：人做的步骤等人", human.ok and not calls and "轮到你" in "".join(human.lines), str(human.lines))
+        task_layer.run_ai = real_ai
 
         step = report.task_step(root, data, "试一次", "比对", "比完了")
         test("走一步：判据通过", step.ok and any(row[1] == "✓" for row in step.rows), str(step.rows))

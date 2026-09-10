@@ -366,7 +366,7 @@ class Desk(QWidget):
         self.note = QLineEdit()
         self.note.setPlaceholderText("一句话（可留空）")
         row.addWidget(self.note, 1)
-        step_button = QPushButton("走这一步")
+        step_button = QPushButton("走下一步")
         step_button.setDefault(True)
         step_button.clicked.connect(self.run_selected)
         row.addWidget(step_button)
@@ -432,7 +432,8 @@ class Desk(QWidget):
         for row, step in enumerate(steps):
             judges = len([line for line in step.judges.splitlines() if line.strip()])
             self.steps_table.setItem(row, 0, QTableWidgetItem(step.name))
-            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{judges} 条判据" if judges else "无判据"))
+            who = step.executor if not step.human else "人"
+            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{who}　{'%d 条判据' % judges if judges else '无判据'}"))
             self.steps_table.setItem(row, 2, QTableWidgetItem("✓" if step.name in done else "—"))
         if steps and self.steps_table.currentRow() < 0:
             nxt = self.task.next_step()
@@ -453,7 +454,11 @@ class Desk(QWidget):
         if self.task is None:
             bar.showMessage("先起一件任务")
             return report.Result(ok=False, lines=["先起一件任务"])
-        result = report.task_step(self.root, self.data, self.task.name, self.selected_step(), self.note.text().strip())
+        row = self.steps_table.currentRow()
+        nxt = self.task.next_step()
+        current = self.selected_step()
+        auto = bool(nxt and current == nxt.name)  # 选中的是下一步：按执行者分派（默认 AI）
+        result = report.task_step(self.root, self.data, self.task.name, current, self.note.text().strip(), auto=auto)
         self.note.clear()
         self.reload()
         bar.showMessage(result.lines[0] if result.lines else "")

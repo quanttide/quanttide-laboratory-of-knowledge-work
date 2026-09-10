@@ -14,6 +14,7 @@
 """
 
 import json
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -130,17 +131,69 @@ def listing(root: Path, data: Path) -> list[Task]:
     return [Task(root, Path(data), path.stem) for path in sorted(base.glob("*.md"))] if base.is_dir() else []
 
 
-def execute(task: Task, root: Path, step: str, note: str = "") -> tuple[bool, list[str], list[tuple[str, str, str]]]:
-    """走一步：跑那一步的验收判据，记账，写报告。"""
+def prompt_for(task: Task, step: workflow_layer.Step) -> str:
+    """交给 AI 的那一段话：这一步做什么、判据是什么、产物落在哪。"""
+    steps = "、".join(item.name for item in task.steps())
+    return f"""你在按一条工作流走一步。只做这一步，做完就停。
+
+工作区：{task.root}
+数据仓：{task.data}
+任务：{task.name}（目标：{task.goal() or "（没写）"}）
+工作流：{task.workflow_name()}（步骤：{steps}）
+这一步：{step.name}
+做什么：
+{step.what}
+
+判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
+{step.judges or "（这一步没有机械判据，判断留给人）"}
+
+产物落在：{task.artifacts_dir}
+规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
+"""
+
+
+def run_ai(prompt: str, root: Path, timeout: int = 900) -> tuple[bool, str]:
+    """把这一步交给 AI 跑：非交互调 pi。测试里会替换这个函数，别在测试里真调。"""
+    try:
+        done = subprocess.run(["pi", "-p", "--no-session", prompt], cwd=root, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError:
+        return False, "没找到 pi"
+    except subprocess.TimeoutExpired:
+        return False, "pi 超时"
+    out = (done.stdout or "").strip() or (done.stderr or "").strip()
+    return done.returncode == 0, out
+
+
+def one_line(text: str, limit: int = 80) -> str:
+    line = next((line.strip() for line in reversed(text.strip().splitlines()) if line.strip()), "")
+    return line[:limit]
+
+
+def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = False) -> tuple[bool, list[str], list[tuple[str, str, str]]]:
+    """走一步：能让 AI 跑的交给 AI，然后跑判据、记账、写报告。"""
     found = task.workflow().step(step)
     if found is None:
         return False, [f"工作流里没有这一步：{step}"], []
+    lines: list[str] = []
+    if auto and not found.human:
+        lines.append(f"{found.name}：交给 AI（{found.executor}）跑")
+        ran, out = run_ai(prompt_for(task, found), root)
+        lines.append(f"  AI {'跑完了' if ran else '跑不动'}：{one_line(out) if out else '（没输出）'}")
+        task.record(found.name, f"AI 执行：{one_line(out) if out else '（没输出）'}", ok=ran)
+        if not ran:
+            write_report(task, [])
+            lines.append("  （AI 没跑成，这一步不算过；修好再来）")
+            return False, lines, []
+    elif found.human and auto:
+        lines.append(f"{found.name}：这一步的执行者是人（{found.executor}）——轮到你，做完用 kg task <名字> --done {found.name}")
+        return True, lines, []
     results, gates = checks_layer.run(root, checks_layer.parse(found.judges, section=None))
     ok = all(passed for _, passed, _ in results)
     detail = note.strip() or ("；".join(item.note for item, _, _ in results) if results else "做完")
-    task.record(step, detail, ok=ok)
+    if not (auto and not found.human):
+        task.record(step, detail, ok=ok)
     write_report(task, gates)
-    lines = [f"{'✓' if ok else '✗'} {step}：{detail}"]
+    lines.append(f"{'✓' if ok else '✗'} {step}：{detail}")
     lines += [f"  {'✓' if passed else '✗'} {item.note}（{spec}）" for item, passed, spec in results]
     lines += [f"  ⧗ {item.note}（留给闸门）" for item in gates]
     rows = [(item.note, "✓" if passed else "✗", spec) for item, passed, spec in results]
