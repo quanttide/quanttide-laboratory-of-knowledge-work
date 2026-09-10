@@ -62,7 +62,7 @@ data/history/工具成形.md  历史（叙事）：这个任务的来龙去脉
 data/samples/             判例：真实契约与真实报告
 ```
 
-都是 Markdown 与一行行 JSON，能读能改也能进版本库。程序默认把数据写在本仓 `data/`（`--data` 换数据仓，`--cases` 单独换任务目录）。
+都是 Markdown 与一行行 JSON，能读能改也能进版本库。程序默认把数据写在本仓 `data/`（`--data` 换数据仓，`--tasks` 单独换任务目录）。
 
 ## 窗口
 
