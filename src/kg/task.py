@@ -56,9 +56,9 @@ class Task:
         return self.data / "artifacts"
 
     def artifact(self, kind: str) -> Path:
-        """产物与流水各归其位：流水跟着任务走（tasks/<任务>.jsonl），产物按类型进 artifacts/。"""
+        """流水就在任务文件里（{{log}} 指它），产物按类型进 artifacts/。"""
         if kind == LOG:
-            return self.file.with_suffix(".jsonl")
+            return self.file
         return self.artifacts_dir / kind / f"{self.name}{SUFFIX[kind]}"
 
     def exists(self) -> bool:
@@ -83,8 +83,8 @@ class Task:
         return self.workflow().steps()
 
     def events(self) -> list[dict]:
-        path = self.artifact(LOG)
-        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()] if path.is_file() else []
+        """流水：任务文件里的 log 一节，一条一条按发生顺序。"""
+        return [event for event in (self.payload().get("log") or []) if isinstance(event, dict)]
 
     def done(self) -> set[str]:
         """哪些步骤走过了：流水里成功执行过的、且名字确实是工作流上的步骤。"""
@@ -96,9 +96,11 @@ class Task:
         return next((step for step in self.steps() if step.name not in done), None)
 
     def record(self, step: str, detail: str, ok: bool = True) -> None:
-        self.artifact(LOG).parent.mkdir(parents=True, exist_ok=True)
-        with self.artifact(LOG).open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"at": now(), "step": step, "detail": detail, "ok": ok}, ensure_ascii=False) + "\n")
+        """记一笔流水：读任务文件、追加一条、写回去（流水只增不改）。"""
+        payload = self.payload()
+        payload.setdefault("log", []).append({"at": now(), "step": step, "detail": detail, "ok": ok})
+        self.file.parent.mkdir(parents=True, exist_ok=True)
+        self.file.write_text(dump(payload), encoding="utf-8")
 
     def relative(self, path: Path) -> str:
         return str(path.relative_to(self.data)) if path.is_relative_to(self.data) else str(path)
@@ -109,10 +111,10 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     task = Task(root, Path(data), name)
     task.file.parent.mkdir(parents=True, exist_ok=True)
     task.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    for kind in (REPORT, JOURNAL, LOG):
+    for kind in (REPORT, JOURNAL):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(dump({"name": name, "workflow": workflow_name}), encoding="utf-8")
+        task.file.write_text(dump({"name": name, "workflow": workflow_name, "log": []}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(JOURNAL).is_file():
@@ -150,7 +152,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 本任务的三样东西（报告与日志是产物，流水是执行痕迹）：
   报告：{task.relative(task.artifact(REPORT))}（程序只维护「执行记录」与「闸门项」两节，其余节归你写）
   日志：{task.relative(task.artifact(JOURNAL))}
-  流水：{task.relative(task.artifact(LOG))}
+  流水：{task.relative(task.artifact(LOG))}（就在任务文件里）
 工作流里用 {{{{report}}}} / {{{{journal}}}} / {{{{log}}}} 指这三样；工作内容写进报告，别动程序那两节。
 规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """

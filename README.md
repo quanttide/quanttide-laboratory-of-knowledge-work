@@ -43,7 +43,7 @@ uv venv .venv && uv pip install -e ".[gui]"
 ## 目录
 
 - `src/kg/` 程序：assets（资产层：二十格与落点）、catalog（目录层）、checks（判据）、material（材料）、records（记录段位与骨架：任务三段、报告四段、历史）、task（任务：状态机、动作、流水）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`workflows/` 定义、`tasks/` 任务与流水（`<任务>.yaml` + `<任务>.jsonl`）、`artifacts/{report,journal}/` 产物
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`workflows/` 定义、`tasks/` 任务（`<任务>.yaml`：workflow + log 流水，一个任务一个文件）、`artifacts/{report,journal}/` 产物
 - `tests/` 自带测试：`python3 tests/test_kg.py`，26 项；装了 PySide6 窗口模块则多 6 项界面冒烟，不依赖 pytest
 - `docs/` 说明：模式与记录（index.md）、用户指南、开发计划
 

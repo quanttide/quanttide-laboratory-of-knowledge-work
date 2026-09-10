@@ -164,7 +164,8 @@ def flow_and_task(real: Path) -> None:
         test("任务：状态里看得到工作流与指令文件",
              any("工作流：试一条" in line for line in started.lines) and any("指令：" in line for line in started.lines),
              str(started.lines[:4]))
-        test("任务文件只留 name 与 workflow（要什么由工作流说）", set(task.payload()) == {"name", "workflow"}, str(task.payload()))
+        test("任务文件 = name + workflow + 流水（一个任务一个文件）", set(task.payload()) == {"name", "workflow", "log"}, str(task.payload()))
+        test("流水记在任务文件里（不再另开 jsonl）", task.artifact("log") == task.file and [e["step"] for e in task.events()][:1] == ["开工"], str(task.events()[:1]))
         test("任务：起时记一笔", len(task.events()) == 1)
         auto = report.task_step(root, data, "试一次", "", auto=True)  # 默认执行者是 AI，交给 pi
         test("走一步：默认交给智能体跑", bool(calls) and "这一步：定位" in calls[0], str(calls[:1])[:60])
@@ -204,11 +205,9 @@ def flow_and_task(real: Path) -> None:
         test("列任务：报工作流与下一步", report.task_list(root, data).rows[0][1] == "试一条")
         test("工作流里没有的步骤就报错", not report.task_step(root, data, "试一次", "乱来", "", None) if False else not report.task_step(root, data, "试一次", "乱来").ok)
         test("数据分三家放", task.file.is_relative_to(data / "tasks") and flow.file.is_relative_to(data / "workflows") and task.artifacts_dir.is_relative_to(data / "artifacts"))
-        test("流水跟着任务走、产物按类型进 artifacts/",
-             task.artifact("report").parent.name == "report" and task.artifact("report").name == "试一次.md"
-             and task.artifact("journal").parent.name == "journal"
-             and task.artifact("log").parent.name == "tasks" and task.artifact("log").name == "试一次.jsonl",
-             f"{task.artifact('report')} / {task.artifact('log')}")
+        test("产物按类型进 artifacts/",
+             task.artifact("report").parent.name == "report" and task.artifact("report").name == "试一次.md" and task.artifact("journal").parent.name == "journal",
+             f"{task.artifact('report')} / {task.artifact('journal')}")
 
 
 def carry(real: Path) -> None:

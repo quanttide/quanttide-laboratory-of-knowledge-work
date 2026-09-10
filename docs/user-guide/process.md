@@ -135,7 +135,7 @@ $ kg task 课程档案比对 --journal "先找齐两边，再按口径 / 重叠 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
 data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流（要什么由工作流的 description 说）
-data/tasks/<任务>.jsonl          流水：跟着任务走（只增不改）
+data/tasks/<任务>.yaml           任务：workflow + log（流水就在文件里，只增不改）
 data/artifacts/report/<任务>.md   报告：程序维护「执行记录」「闸门项」两节，其余节是人 / AI 写的产物
 data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙去脉
 
@@ -155,7 +155,7 @@ data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙�
 
 ## 规矩
 
-- **流水跟着任务走**：`tasks/<任务>.jsonl`；产物（报告、日志）进 `artifacts/` 按类型分家。
+- **一个任务一个文件**：`tasks/<任务>.yaml` 里既是配置（workflow）也是流水（log）；产物（报告、日志）进 `artifacts/` 按类型分家。
 - **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `executor: human` 的判据上（拍板）；
 - **智能体不能审自己那一步**——同一步的执行者与判据若是同一个智能体，等于自评自过（现在实现里是同一个 pi，流水里标了「AI 审查（同一模型）」，将来要换成另一个执行者）；
 

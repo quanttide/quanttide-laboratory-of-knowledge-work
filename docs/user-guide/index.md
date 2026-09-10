@@ -60,7 +60,7 @@ data/workflows/<工作流>.md     定义：串联的步骤与判据
 data/tasks/<任务>.md           实例：跑哪条工作流、要什么
 data/artifacts/report/<任务>.md   报告（事件 + 工作内容）
 data/artifacts/journal/<任务>.md  日志（叙事）
-data/tasks/<任务>.jsonl           流水（跟着任务走）
+data/tasks/<任务>.yaml            任务：workflow + log（流水就在文件里）
 ```
 
 ## 窗口

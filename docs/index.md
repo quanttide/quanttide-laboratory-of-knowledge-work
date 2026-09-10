@@ -30,7 +30,7 @@ data/
 ├── workflows/<运行>.md          工作流：步骤清单（- 步骤 → tasks/<运行>/步骤.md）
 ├── tasks/<运行>/<步骤>.md        任务：目标 / 步骤 / 验收
 └── artifacts/<运行>/
-    ├── log.jsonl              执行记录
+    ├── log（流水）            记在任务文件里
     ├── report.md              报告（事件）：执行记录 + 闸门项
     └── history.md             历史（叙事）
 ```
