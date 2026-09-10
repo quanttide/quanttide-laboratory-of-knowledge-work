@@ -91,7 +91,7 @@ SPECS = (
     Spec("查看", "找文档", "按名找——认文件名与中文标题", ("名字", "看正文"), lambda root, v: report.find(root, value(v, "名字"), bool(v.get("看正文")))),
     Spec("查看", "看材料", "类型 / 内容 / 来源 / 时间；阶段由位置承担", ("材料路径",), lambda root, v: report.material(root, material_paths(v)), "材料.json", lambda root, v: report.material_payload(root, material_paths(v))),
     Spec("指令", "写指令骨架", "目标 / 步骤 / 验收", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_instruction(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
-    Spec("指令", "核对指令", "三段齐不齐、机械核对过不过、闸门项有哪些", ("指令文件", "写入报告（可留空）"), lambda root, v: report.audit_instruction(root, Path(value(v, "指令文件")), Path(value(v, "写入报告（可留空）")) if value(v, "写入报告（可留空）") else None)),
+    Spec("指令", "核对指令", "三段齐不齐、验收里的判据过不过、闸门项有哪些", ("指令文件",), lambda root, v: report.audit_instruction(root, Path(value(v, "指令文件")))),
     Spec("报告", "写报告骨架", "生成者产出 / 审查者报告 / 人类裁决 / 最终成果", ("目标文件", "以它为题（可留空）"), lambda root, v: report.new_report(Path(value(v, "目标文件")), value(v, "以它为题（可留空）"))),
     Spec("报告", "核对报告", "四段齐不齐", ("报告文件",), lambda root, v: report.audit_report(Path(value(v, "报告文件")))),
 )
@@ -199,7 +199,7 @@ class Browser(QWidget):
             if field in ("看正文", "补建缺的资产"):
                 widget = QCheckBox()
                 self.widgets[field] = widget
-            elif optional(field).endswith("文件") or optional(field) in ("以它为题", "写入报告"):
+            elif optional(field).endswith("文件") or optional(field) in ("以它为题",):
                 widget = self._with_browse(field)
             else:
                 widget = QLineEdit()
@@ -223,7 +223,7 @@ class Browser(QWidget):
         button = QPushButton("浏览…")
 
         def choose() -> None:
-            if optional(field) in ("目标文件", "写入报告"):
+            if optional(field) == "目标文件":
                 path, _ = QFileDialog.getSaveFileName(self, "写到哪", str(self.root), "Markdown (*.md)")
             else:
                 path, _ = QFileDialog.getOpenFileName(self, "选文件", str(self.root), "Markdown (*.md)")
@@ -321,7 +321,7 @@ class Browser(QWidget):
 
 
 class Desk(QWidget):
-    """台面：选一次运行，看七个标准任务的状态，点下一步往前走。"""
+    """台面：选一次运行，看步骤与关联的任务，执行一步。"""
 
     def __init__(self, root: Path, data: Path, runs: Path | None = None):
         super().__init__()
@@ -329,7 +329,6 @@ class Desk(QWidget):
         self.data = data
         self.runs = runs
         self.run: flow_layer.Run | None = None
-        self.step_buttons: dict[str, QPushButton] = {}
         self._build()
         self.reload()
 
@@ -346,57 +345,60 @@ class Desk(QWidget):
         fresh.clicked.connect(self._new_run)
         top.addWidget(fresh)
         top.addStretch(1)
-        outer.addLayout(top)
-
         self.next_label = QLabel()
-        self.next_label.setWordWrap(True)
         font = self.next_label.font()
         font.setBold(True)
         self.next_label.setFont(font)
-        outer.addWidget(self.next_label)
+        top.addWidget(self.next_label)
+        outer.addLayout(top)
 
-        middle = QHBoxLayout()
-        self.state_table = QTableWidget(0, 2)
-        self.state_table.setHorizontalHeaderLabels(["段", "状态"])
-        self.state_table.verticalHeader().setVisible(False)
-        self.state_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.state_table.setMaximumWidth(260)
-        self.state_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.state_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        middle.addWidget(self.state_table)
+        self.steps_table = QTableWidget(0, 3)
+        self.steps_table.setHorizontalHeaderLabels(["步骤", "关联的任务", "状态"])
+        self.steps_table.verticalHeader().setVisible(False)
+        self.steps_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.steps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.steps_table.setAlternatingRowColors(True)
+        header = self.steps_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.steps_table.itemSelectionChanged.connect(lambda: self.note.setPlaceholderText(self._note_hint()))
+        self.steps_table.itemDoubleClicked.connect(lambda _: self._open_task())
+        outer.addWidget(self.steps_table, 1)
 
-        steps = QVBoxLayout()
-        row = QHBoxLayout()
-        for label, action, hint in STEPS:
-            button = QPushButton(label)
-            button.setToolTip(hint)
-            button.clicked.connect(lambda _=False, a=action: self.step(a))
-            self.step_buttons[action] = button
-            row.addWidget(button)
-        row.addStretch(1)
-        steps.addLayout(row)
+        run_row = QHBoxLayout()
+        run_row.addWidget(QLabel("这一步做了什么"))
+        self.note = QLineEdit()
+        self.note.setPlaceholderText("一句话（可留空）")
+        run_row.addWidget(self.note, 1)
+        step_button = QPushButton("执行这一步")
+        step_button.setDefault(True)
+        step_button.clicked.connect(self.run_selected)
+        run_row.addWidget(step_button)
+        history_button = QPushButton("写历史…")
+        history_button.clicked.connect(self.write_history)
+        run_row.addWidget(history_button)
+        outer.addLayout(run_row)
+
         self.log_table = QTableWidget(0, 3)
-        self.log_table.setHorizontalHeaderLabels(["时间", "动作", "说明"])
+        self.log_table.setHorizontalHeaderLabels(["时间", "步骤", "说明"])
         self.log_table.verticalHeader().setVisible(False)
         self.log_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.log_table.setAlternatingRowColors(True)
-        header = self.log_table.horizontalHeader()
+        log_header = self.log_table.horizontalHeader()
         for col in (0, 1):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        steps.addWidget(self.log_table, 1)
-        middle.addLayout(steps, 1)
-        outer.addLayout(middle, 1)
+            log_header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        log_header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        outer.addWidget(self.log_table, 1)
 
     # ---- 读 ----
 
     def reload(self) -> None:
-        """重扫任务目录，尽量把选中的那件事留着。"""
         keep = self.run.name if self.run else ""
         found = flow_layer.listing(self.root, self.data, self.runs)
         self.picker.blockSignals(True)
         self.picker.clear()
-        self.picker.addItems([task.name for task in found])
+        self.picker.addItems([item.name for item in found])
         if keep:
             index = self.picker.findText(keep)
             if index >= 0:
@@ -410,76 +412,87 @@ class Desk(QWidget):
         self.run = found[index] if 0 <= index < len(found) else None
         self.refresh()
 
+    def selected_step(self) -> str:
+        row = self.steps_table.currentRow()
+        if row < 0:
+            if self.run is None:
+                return ""
+            step = self.run.next_step()
+            return step.name if step else ""
+        item = self.steps_table.item(row, 0)
+        return item.text() if item else ""
+
+    def _note_hint(self) -> str:
+        step = self.selected_step()
+        return f"{step} 这一步做了什么（可留空）" if step else "一句话（可留空）"
+
     # ---- 画 ----
 
     def refresh(self) -> None:
         if self.run is None:
-            self.next_label.setText("还没有运行——点「新建…」起一件")
-            self.state_table.setRowCount(0)
+            self.next_label.setText("还没有运行——点「新建…」起一次")
+            self.steps_table.setRowCount(0)
             self.log_table.setRowCount(0)
-            for button in self.step_buttons.values():
-                button.setEnabled(False)
             return
-        state = self.run.stages()
-        self.state_table.setRowCount(len(flow_layer.STAGES))
-        for row, stage in enumerate(flow_layer.STAGES):
-            self.state_table.setItem(row, 0, QTableWidgetItem(stage))
-            self.state_table.setItem(row, 1, QTableWidgetItem("✓" if state[stage] else "—"))
-        action, hint = self.run.next_action()
+        done = self.run.done()
+        steps = self.run.steps()
+        self.steps_table.setRowCount(len(steps))
+        for row, step in enumerate(steps):
+            self.steps_table.setItem(row, 0, QTableWidgetItem(step.name))
+            self.steps_table.setItem(row, 1, QTableWidgetItem(step.task))
+            self.steps_table.setItem(row, 2, QTableWidgetItem("✓" if step.name in done else "—"))
+        if steps and self.steps_table.currentRow() < 0:
+            nxt = self.run.next_step()
+            rows = [i for i, step in enumerate(steps) if nxt and step.name == nxt.name]
+            self.steps_table.selectRow(rows[0] if rows else 0)
         self.next_label.setText(flow_layer.state_line(self.run))
-        for key, button in self.step_buttons.items():
-            button.setEnabled(True)
-            button.setDefault(key == action)
-            button.setStyleSheet("font-weight: bold;" if key == action else "")
         events = self.run.events()
         self.log_table.setRowCount(len(events))
         for row, event in enumerate(reversed(events)):
             self.log_table.setItem(row, 0, QTableWidgetItem(event["at"]))
-            self.log_table.setItem(row, 1, QTableWidgetItem(event["kind"]))
+            self.log_table.setItem(row, 1, QTableWidgetItem(event["step"]))
             self.log_table.setItem(row, 2, QTableWidgetItem(event["detail"]))
 
-    # ---- 走一步 ----
+    # ---- 动 ----
 
-    def step(self, action: str) -> report.Result:
+    def run_selected(self) -> report.Result:
         bar = self.window().statusBar()
         if self.run is None:
             bar.showMessage("先起一次运行")
             return report.Result(ok=False, lines=["先起一次运行"])
-        value = self._ask(action)
-        if value is None:  # 用户取消
-            return report.Result(ok=False, lines=["取消了"])
-        result = report.run_step(self.root, self.run.name, action, value, self.data, str(self.runs) if self.runs else None)
+        step = self.selected_step()
+        result = report.run_step(self.root, self.run.name, step, self.note.text().strip(), self.data, str(self.runs) if self.runs else None)
+        self.note.clear()
         self.reload()
-        if action == "instruction" and not self.run.stages()["指令"]:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.run.file(flow_layer.TASK_FILE))))
-            result.lines.append(f"已打开 {self.run.file(flow_layer.TASK_FILE)}——把步骤与验收填上")
         bar.showMessage(result.lines[0] if result.lines else "")
         return result
 
-    def _ask(self, action: str) -> str | None:
-        """要填的几步先问一下；其余直接走。"""
-        if action in ("material", "output"):
-            what = "材料" if action == "material" else "产出"
-            path, _ = QFileDialog.getOpenFileName(self, f"选一份{what}", str(self.root))
-            if not path:
-                return None
-            candidate = Path(path)
-            return report.short(self.root, candidate) if candidate.is_relative_to(self.root) else path
-        if action in ("decision", "history"):
-            title = "裁决" if action == "decision" else "历史"
-            prompt = "谁拍的板、决定是什么" if action == "decision" else "这个任务的来龙去脉（报告记事，历史叙事）"
-            words, ok = QInputDialog.getMultiLineText(self, title, prompt)
-            return words.strip() if ok else None
-        return ""
+    def write_history(self) -> None:
+        if self.run is None:
+            return
+        words, ok = QInputDialog.getMultiLineText(self, "历史", "这一次的来龙去脉（报告记事，历史叙事）")
+        if ok and words.strip():
+            report.run_history(self.root, self.run.name, words.strip(), self.data, str(self.runs) if self.runs else None)
+            self.reload()
+
+    def _open_task(self) -> None:
+        if self.run is None:
+            return
+        step = self.selected_step()
+        path = self.run.task_of(step)
+        if path.is_file():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _new_run(self) -> None:
-        name, ok = QInputDialog.getText(self, "起一次运行", "这次运行叫什么")
+        name, ok = QInputDialog.getText(self, "起一次运行", "这一次叫什么")
         if not ok or not name.strip():
             return
-        about, ok = QInputDialog.getText(self, "起一次运行", "一句话说清要什么（可留空）")
-        self.run = flow_layer.create(self.root, name.strip(), self.data, self.runs, about.strip() if ok else "")
+        about, ok = QInputDialog.getText(self, "起一次运行", "这一次要什么（可留空）")
+        steps, ok = QInputDialog.getText(self, "起一次运行", "步骤清单，逗号分开（留空用七个常见步骤）")
+        chosen = [item.strip() for item in steps.split(",") if item.strip()] if ok else []
+        self.run = flow_layer.create(self.root, name.strip(), self.data, chosen or None, self.runs, about.strip())
         self.reload()
-        self.window().statusBar().showMessage(f"起了：{task.dir}")
+        self.window().statusBar().showMessage(f"起了：{self.run.dir}")
 
 
 class Window(QMainWindow):

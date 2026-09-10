@@ -49,6 +49,8 @@ def parse(text: str, section: str = "验收") -> list[Item]:
         if not match:
             continue
         body = match.group(1).strip()
+        if "<" in body:  # 模板占位不算判据
+            continue
         found = SPEC.search(body)
         items.append(Item(SPEC.sub("", body).strip(" ——：、"), found.group(1).strip() if found else None))
     return items

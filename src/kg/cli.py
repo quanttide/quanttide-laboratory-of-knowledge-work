@@ -10,27 +10,19 @@
 
 指令
   kg new-instruction <文件> [--about 目标]  写指令骨架（目标 / 步骤 / 验收）
-  kg audit-instruction <文件> [--into 报告] 核对指令；--into 把审查者报告写进报告
+  kg audit-instruction <文件>     核对指令：三段齐不齐、验收里的判据过不过
 
 报告（事件）
   kg new-report <文件> [--about 标题]     写报告骨架（事件）
   kg audit-report <文件>         核对报告——段位齐全
 
-工作流
-  kg workflow                    看工作流：默认「一次交付」的七个标准任务与各自产出物
-
-运行（工作流的一次运行；每个动作就是把一个标准任务执行一次）
-  kg run --list                  有哪些运行、各自下一个标准任务
-  kg run --new <名字>            起一次运行
-  kg run <名字>                  看七个标准任务的状态与流水
-  kg run <名字> --material <路径>    材料：记一条输入（类型 / 阶段 / 时间 / 来源现填）
-  kg run <名字> --instruction     指令：写出目标 / 步骤 / 验收，人补齐
-  kg run <名字> --review          核对：跑验收里的机械判据，结果写进报告
-  kg run <名字> --output <路径>      产出：记一笔做出来的东西
-  kg run <名字> --decision <话>      裁决：谁拍板、决定是什么
-  kg run <名字> --finish          成果：把产出收束成成果，写进报告
+运行（工作流的一次运行；人执行的是任务，一步一个任务）
+  kg run --list                  有哪些运行、各自下一个步骤
+  kg run --new <名字> [--steps 甲,乙,丙]   起一次运行：写工作流（步骤清单）+ 每步关联的任务骨架
+  kg run <名字>                  看步骤、关联的任务、下一步与流水
+  kg run <名字> --done <步骤> [--note 一句话]   执行这一步：跑该任务的验收判据、记账、写报告
   kg run <名字> --history <一段话>   历史：写下这一次的来龙去脉（叙事）
-  （数据默认落在实验室的 data/：报告进 report/、历史进 history/、运行的现场进 runs/）
+  （数据默认落在实验室的 data/：报告进 report/、历史进 history/、现场进 runs/）
 
 默认工作区从当前目录往上找（含 data/journal 的目录）；用 --root 指定别的第二大脑。
 """
@@ -88,7 +80,7 @@ def cmd_new_report(root: Path, args) -> int:
 
 
 def cmd_audit_instruction(root: Path, args) -> int:
-    return emit(report.audit_instruction(root, Path(args.target), Path(args.into) if args.into else None))
+    return emit(report.audit_instruction(root, Path(args.target)))
 
 
 def cmd_run(root: Path, args) -> int:
@@ -96,37 +88,20 @@ def cmd_run(root: Path, args) -> int:
     if args.list:
         return emit(report.run_list(root, data, args.runs))
     if args.new:
-        return emit(report.run_new(root, args.name or "", data, args.runs, args.about))
+        steps = [item.strip() for item in args.steps.split(",") if item.strip()] if args.steps else None
+        return emit(report.run_new(root, args.name or "", data, steps, args.runs, args.about))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg run <名字>，或 kg run --list / --new <名字>"]))
-    for action in ("material", "instruction", "review", "output", "decision", "finish", "history"):
-        if getattr(args, action):
-            value = value_of(args, action)
-            return emit(report.run_step(root, args.name, action, value, data, args.runs))
+    if args.history is not None:
+        return emit(report.run_history(root, args.name, args.history if isinstance(args.history, str) else "", data, args.runs))
+    if args.done is not None:
+        note = args.note or ""
+        return emit(report.run_step(root, args.name, args.done if isinstance(args.done, str) else "", note, data, args.runs))
     return emit(report.run_status(root, args.name, data, args.runs))
-
-
-def value_of(args, action: str) -> str:
-    """能带值的几步：材料与产出给路径，裁决与历史给一段话；指令与核对不带值也能走。"""
-    given = getattr(args, action)
-    if action in ("material", "output"):
-        return given if isinstance(given, str) else ""
-    if action in ("decision", "history", "instruction"):
-        return given if isinstance(given, str) else ""
-    return ""
 
 
 def cmd_audit_report(root: Path, args) -> int:
     return emit(report.audit_report(Path(args.target)))
-
-
-def cmd_workflow(root: Path, args) -> int:
-    flow = flow_layer.WORKFLOW
-    result = report.Result(columns=("标准任务", "产出物", "怎么算完"), lines=[f"工作流：{flow.name}——{flow.note}", "标准任务："])
-    for task in flow.tasks:
-        result.rows.append((task.name, task.output, task.accept))
-        result.lines.append(f"  {task.name}：{task.what} → {task.output}（{task.accept}）")
-    return emit(result)
 
 
 def cmd_gui(root: Path, args) -> int:
@@ -171,22 +146,17 @@ def build_parser() -> argparse.ArgumentParser:
     dossier.add_argument("--about", default="", metavar="标题")
     checking = sub.add_parser("audit-instruction", help="核对指令")
     checking.add_argument("target", metavar="文件")
-    checking.add_argument("--into", metavar="报告", help="把审查者报告写进这份报告")
     sub.add_parser("audit-report", help="核对报告").add_argument("target", metavar="文件")
-    runner = sub.add_parser("run", help="工作流的一次运行：起、看、走一个标准任务")
+    runner = sub.add_parser("run", help="工作流的一次运行：起、看、执行一步")
     runner.add_argument("name", nargs="?", metavar="名字")
-    runner.add_argument("--list", action="store_true", help="有哪些事、各自下一步")
+    runner.add_argument("--list", action="store_true", help="有哪些运行、各自下一个步骤")
     runner.add_argument("--new", action="store_true", help="起一次运行")
-    runner.add_argument("--about", default="", metavar="一句话", help="这次运行的一句话（目标）")
-    runner.add_argument("--runs", metavar="目录", help="任务放哪（默认 <数据仓>/tasks）")
-    runner.add_argument("--material", nargs="?", const=True, metavar="路径")
-    runner.add_argument("--instruction", nargs="?", const=True, metavar="目标一句话")
-    runner.add_argument("--review", action="store_true")
-    runner.add_argument("--output", nargs="?", const=True, metavar="路径")
-    runner.add_argument("--decision", nargs="?", const=True, metavar="一句话")
-    runner.add_argument("--finish", action="store_true")
-    runner.add_argument("--history", nargs="?", const=True, metavar="一段话")
-    sub.add_parser("workflow", help="看工作流：一串标准任务")
+    runner.add_argument("--about", default="", metavar="一句话", help="这一次要什么")
+    runner.add_argument("--steps", default="", metavar="甲,乙,丙", help="起运行时写步骤清单（留空用七个常见步骤）")
+    runner.add_argument("--runs", metavar="目录", help="现场放哪（默认 <数据仓>/runs）")
+    runner.add_argument("--done", nargs="?", const=True, metavar="步骤", help="执行这一步")
+    runner.add_argument("--note", default="", metavar="一句话", help="记一句这一步做了什么")
+    runner.add_argument("--history", nargs="?", const=True, metavar="一段话", help="历史：写下这一次的来龙去脉")
     sub.add_parser("gui", help="开图形界面")
     return parser
 
@@ -201,7 +171,6 @@ HANDLERS = {
     "audit-instruction": cmd_audit_instruction,
     "audit-report": cmd_audit_report,
     "run": cmd_run,
-    "workflow": cmd_workflow,
     "gui": cmd_gui,
 }
 

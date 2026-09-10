@@ -7,20 +7,16 @@
 
 from pathlib import Path
 
-REPORT_SECTIONS = ("生成者产出", "审查者报告", "人类裁决", "最终成果")
+REPORT_SECTIONS = ("执行记录", "闸门项")
 TASK_SECTIONS = ("目标", "步骤", "验收")
 CHECK_SECTION = "验收"  # 判据（机械 / 闸门）住在这儿
 HISTORY_PLACEHOLDER = "（这个任务的来龙去脉，你写）"
 
 REPORT_TEMPLATE = """# 报告：{title}
 
-## 生成者产出
+## 执行记录
 
-## 审查者报告
-
-## 人类裁决
-
-## 最终成果
+## 闸门项
 """
 
 HISTORY_TEMPLATE = """# 历史：{title}

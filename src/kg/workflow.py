@@ -1,72 +1,34 @@
-"""工作流：过程的编排定义——一串标准任务；以及它的一次运行。
+"""工作流：一串步骤，每步关联一个任务；以及它的一次运行（执行）。
 
-规格：工作流（Workflow）是过程的编排定义，以有向无环图描述任务之间的衔接
-（`docs/specification/process/workflow.md`）；任务是过程的一次执行实例
-（`docs/specification/process/task.md`）。
+规格：工作流（Workflow）＝过程的编排定义；任务（Task）＝干活的单位（目标 / 步骤 / 验收）。
+本程序不预置编排——一次运行的工作流写在自己的现场里，步骤关联哪些任务由现场说了算。
 
-默认工作流「一次交付」，七个标准任务（线性）：
+<数据仓>/runs/<名字>/
+  ├── workflow.md      本次工作流：步骤清单（- 步骤名 → tasks/<步骤名>.md）
+  ├── tasks/<步骤名>.md  每个步骤关联的任务（目标 / 步骤 / 验收）
+  └── log.jsonl        执行记录：哪一步、什么时候、结果如何、一句话
 
-  材料 → 指令 → 核对 → 产出 → 裁决 → 成果 → 历史
+<数据仓>/report/<名字>.md   报告（事件）：执行记录与闸门项
+<数据仓>/history/<名字>.md  历史（叙事）：人写
 
-一次运行的现场落在 <数据仓>/runs/<名字>/；记录按资产进格——报告（事件）进 report/、历史（叙事）进 history/：
-
-  runs/<名字>/
-    ├── task.md        这一次的指令（目标 / 步骤 / 验收）
-    ├── materials.md   记进来的输入
-    └── log.jsonl      流水：哪个标准任务、什么时候做的、结果如何
-  report/<名字>.md     事件：生成者产出 / 审查者报告 / 人类裁决 / 最终成果（机器写）
-  history/<名字>.md    叙事（人写）
-
-标准任务由工作流定义，动作只是把某个标准任务执行一次——执行过的事实自动记进流水与报告。
+人执行的是任务：把某个步骤关联的任务做一次，这一步就算走完；事实记进流水与报告。
 """
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from . import checks as checks_layer
 from . import records
 
-@dataclass(frozen=True)
-class StandardTask:
-    """工作流里的一个标准任务：叫什么、干什么、交出什么、怎么算完。"""
-
-    name: str
-    what: str
-    output: str
-    accept: str
-
-
-@dataclass(frozen=True)
-class Workflow:
-    """过程的编排定义：一串标准任务（本程序只有一条线性路径）。"""
-
-    name: str
-    tasks: tuple[StandardTask, ...]
-    note: str = ""
-
-
-# 默认工作流：一次交付
-WORKFLOW = Workflow(
-    name="一次交付",
-    note="从记下输入到留下记录：七个标准任务，一件工件往下走。",
-    tasks=(
-        StandardTask("材料", "把还没做成成品的输入记进来", "materials.md 一行", "四字段（类型/阶段/时间/来源）填得出"),
-        StandardTask("指令", "写下这一次的指令", "task.md", "三段齐全：目标 / 步骤 / 验收"),
-        StandardTask("核对", "按验收跑机械核对", "report.md 的审查者报告", "机械项有结论，闸门项列给人"),
-        StandardTask("产出", "把做出来的东西记上", "report.md 的生成者产出", "落在盘上、路径写得清"),
-        StandardTask("裁决", "谁拍板、决定是什么", "report.md 的人类裁决", "有人、有决定"),
-        StandardTask("成果", "把产出收束成成果", "report.md 的最终成果", "成果由产出收束而来"),
-        StandardTask("历史", "写下这一次的来龙去脉", "history.md", "叙事，人写"),
-    ),
-)
-
-STAGES = tuple(task.name for task in WORKFLOW.tasks)
-TASK_FILE = "task.md"
-MATERIALS = "materials.md"
+WORKFLOW_FILE = "workflow.md"
+TASKS_DIR = "tasks"
 LOG = "log.jsonl"
 REPORT = "report"
 HISTORY = "history"
+STEP_LINE = re.compile(r"^\s*-\s*(?P<name>[^→>-]+?)\s*(?:→|->)\s*(?P<task>\S+\.md)\s*$")
 
 
 def lab_data() -> Path:
@@ -82,192 +44,147 @@ def now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M")
 
 
+@dataclass(frozen=True)
+class Step:
+    """工作流上的一个位置：叫什么，关联哪个任务。"""
+
+    name: str
+    task: str  # 相对现场的路径，如 tasks/材料.md
+
+
 @dataclass
 class Run:
-    """任务：在飞的目录在工作区里，记录按资产进格。"""
+    """一次运行：现场在工作区外，记录按资产进格。"""
 
-    root: Path  # 工作区：读材料、核契约
-    dir: Path  # 在飞的任务目录
-    data: Path  # 数据仓：报告与历史进这里
+    root: Path  # 工作区：读材料、核判据
+    dir: Path  # 现场
+    data: Path  # 数据仓
 
     @property
     def name(self) -> str:
         return self.dir.name
 
-    def file(self, name: str) -> Path:
-        return self.dir / name
+    def file(self, *parts: str) -> Path:
+        return self.dir.joinpath(*parts)
 
     def record_file(self, kind: str) -> Path:
-        """记录落点：报告进 <数据仓>/report，历史进 <数据仓>/history。"""
         return self.data / kind / f"{self.name}.md"
 
     def exists(self) -> bool:
-        return self.file(TASK_FILE).is_file()
+        return self.file(WORKFLOW_FILE).is_file()
 
-    def text(self, name: str) -> str:
-        path = self.file(name)
+    def text(self, *parts: str) -> str:
+        path = self.file(*parts)
         return path.read_text(encoding="utf-8") if path.is_file() else ""
 
-    def items(self, name: str) -> list[str]:
-        """Markdown 列表里的条目。"""
-        return [line.strip()[2:].strip() for line in self.text(name).splitlines() if line.strip().startswith("- ")]
+    def workflow_text(self) -> str:
+        return self.text(WORKFLOW_FILE)
 
-    def instruction(self) -> dict[str, list[str]]:
-        """任务的指令：目标 / 步骤 / 验收（判据住在验收里）。"""
-        return records.read_sections(self.file(TASK_FILE))
+    def steps(self) -> list[Step]:
+        """工作流上的步骤：按写进 workflow.md 的顺序。"""
+        found = []
+        for line in self.workflow_text().splitlines():
+            if match := STEP_LINE.match(line):
+                found.append(Step(match.group("name").strip(), match.group("task").strip()))
+        return found
 
-    def report(self) -> dict[str, list[str]]:
-        path = self.record_file(REPORT)
-        return records.read_sections(path) if path.is_file() else {}
+    def task_of(self, step: str) -> Path:
+        for item in self.steps():
+            if item.name == step:
+                return self.file(item.task)
+        return self.file(TASKS_DIR, f"{step}.md")
 
     def events(self) -> list[dict]:
         return [json.loads(line) for line in self.text(LOG).splitlines() if line.strip()]
 
-    def stages(self) -> dict[str, bool]:
-        """七个标准任务的状态：材料、契约、核对、产出、裁决、成果、历史。"""
-        report = self.report()
-        instruction = self.instruction()
-        history = self.record_file(HISTORY)
-        return {
-            "材料": bool(self.items(MATERIALS)),
-            "指令": bool(instruction.get("步骤")) and bool(instruction.get("验收")),
-            "核对": bool(report.get("审查者报告")),
-            "产出": bool(report.get("生成者产出")),
-            "裁决": bool(report.get("人类裁决")),
-            "成果": bool(report.get("最终成果")),
-            "历史": records.prose(history) != "" if history.is_file() else False,
-        }
+    def done(self) -> set[str]:
+        """哪些步骤做过了：流水里成功执行过的、且名字确实是工作流上的步骤。"""
+        names = {step.name for step in self.steps()}
+        return {event["step"] for event in self.events() if event.get("ok") and event.get("step") in names}
 
-    def next_action(self) -> tuple[str, str]:
-        """下一步：状态机说了算，程序据此只摆出该做的事。"""
-        state = self.stages()
-        for action, hint in (
-            ("材料", "记一条材料（还没做成成品的输入）"),
-            ("指令", "写指令：目标 / 步骤 / 验收（判据写在验收里）"),
-            ("核对", "跑契约的机械核对，结果写进报告"),
-            ("产出", "按契约做出来，记一笔产出"),
-            ("裁决", "谁拍板、决定是什么"),
-            ("成果", "收尾：把产出收束成成果，写进报告"),
-            ("历史", "写这个任务的来龙去脉——报告记事，历史叙事"),
-        ):
-            if not state[action]:
-                return action, hint
-        return "完成", "七格齐了；报告与历史都在该在的格子里"
+    def next_step(self) -> Step | None:
+        done = self.done()
+        return next((step for step in self.steps() if step.name not in done), None)
 
-    # ---- 写 ----
-
-    def record(self, kind: str, detail: str, ok: bool = True) -> None:
+    def record(self, step: str, detail: str, ok: bool = True) -> None:
         with self.file(LOG).open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps({"at": now(), "kind": kind, "detail": detail, "ok": ok}, ensure_ascii=False) + "\n")
-
-    def write(self, name: str, text: str) -> None:
-        self.file(name).write_text(text, encoding="utf-8")
-
-    def append(self, name: str, item: str) -> None:
-        path = self.file(name)
-        text = self.text(name) or f"# {name.removesuffix('.md')}\n"
-        path.write_text(text.rstrip() + f"\n- {item}\n", encoding="utf-8")
-
-    def fill_in(self, path: Path, title: str, body: list[str]) -> None:
-        """把某个文件里某一段的正文换掉（其余各段原样留着）。"""
-        body = [item if item.startswith("- ") else f"- {item}" for item in body]
-        text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        head, marker, tail = text.partition(f"## {title}")
-        if marker:
-            _, _, rest = tail.partition("## ")
-            text = f"{head}## {title}\n\n" + "\n".join(body) + ("\n\n## " + rest if rest else "\n")
-        else:
-            text = text.rstrip() + f"\n\n## {title}\n\n" + "\n".join(body) + "\n"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
-
-    def append_in(self, path: Path, title: str, item: str) -> None:
-        body = records.read_sections(path).get(title, []) if path.is_file() else []
-        self.fill_in(path, title, body + [item])
+            handle.write(json.dumps({"at": now(), "step": step, "detail": detail, "ok": ok}, ensure_ascii=False) + "\n")
 
 
-def create(root: Path, name: str, data: Path, cases: str | Path | None = None, about: str = "") -> Run:
-    """起一次运行：在飞的目录建起来，报告与历史各进对应的格子。"""
-    task = Run(root, runs_root(data, cases) / name, Path(data))
-    task.dir.mkdir(parents=True, exist_ok=True)
-    if not task.file(TASK_FILE).is_file():
-        task.write(TASK_FILE, records.task_template(name, about))
-    if not task.file(MATERIALS).is_file():
-        task.write(MATERIALS, "# 材料\n")
-    report, history = task.record_file(REPORT), task.record_file(HISTORY)
-    for path, text in ((report, records.report_template(name)), (history, records.history_template(name))):
+def create(root: Path, name: str, data: Path, steps: list[str] | None = None, runs: str | Path | None = None, about: str = "") -> Run:
+    """起一次运行：写下工作流（步骤清单）与每个步骤关联的任务骨架。"""
+    run = Run(root, runs_root(data, runs) / name, Path(data))
+    run.file(TASKS_DIR).mkdir(parents=True, exist_ok=True)
+    chosen = steps or ["材料", "指令", "核对", "产出", "裁决", "成果", "历史"]
+    if not run.file(WORKFLOW_FILE).is_file():
+        body = [f"# 工作流：{name}", "", about or "本程序不预置编排；步骤与关联的任务由这份文件说了算。", "", "## 步骤", ""]
+        body += [f"- {step} → {TASKS_DIR}/{step}.md" for step in chosen]
+        run.file(WORKFLOW_FILE).write_text("\n".join(body) + "\n", encoding="utf-8")
+    for step in chosen:
+        task = run.task_of(step)
+        if not task.is_file():
+            task.write_text(records.task_template(step, about or "<这一次要什么，一句话>"), encoding="utf-8")
+    for path, text in ((run.record_file(REPORT), records.report_template(name)), (run.record_file(HISTORY), records.history_template(name))):
         if not path.is_file():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
-    task.record("开工", about or name)
-    return task
+    run.record("开工", about or "起一次运行")
+    return run
 
 
-def open_run(root: Path, name: str, data: Path, cases: str | Path | None = None) -> Run:
-    return Run(root, runs_root(data, cases) / name, Path(data))
+def open_run(root: Path, name: str, data: Path, runs: str | Path | None = None) -> Run:
+    return Run(root, runs_root(data, runs) / name, Path(data))
 
 
-def listing(root: Path, data: Path, cases: str | Path | None = None) -> list[Run]:
-    base = runs_root(data, cases)
-    return [Run(root, child, Path(data)) for child in sorted(base.iterdir()) if (child / TASK_FILE).is_file()] if base.is_dir() else []
+def listing(root: Path, data: Path, runs: str | Path | None = None) -> list[Run]:
+    base = runs_root(data, runs)
+    return [Run(root, child, Path(data)) for child in sorted(base.iterdir()) if (child / WORKFLOW_FILE).is_file()] if base.is_dir() else []
 
 
-# ---- 动作：每一步都留下痕迹 ----
+def execute(run: Run, root: Path, step: str, note: str = "") -> tuple[bool, list[str], list[tuple[str, str, str]]]:
+    """执行一个步骤：跑它关联任务的验收判据，记账，写报告。"""
+    task = run.task_of(step)
+    if not task.is_file():
+        return False, [f"这一步没有关联的任务：{task}"], []
+    text = task.read_text(encoding="utf-8")
+    results, gates = checks_layer.run(root, checks_layer.parse(text))
+    ok = all(passed for _, passed, _ in results)
+    detail = note.strip() or ("；".join(item.note for item, _, _ in results) if results else "做完")
+    run.record(step, detail, ok=ok)
+    write_report(run, results, gates)
+    lines = [f"{'✓' if ok else '✗'} {step}：{detail}"]
+    lines += [f"  {'✓' if passed else '✗'} {item.note}（{spec}）" for item, passed, spec in results]
+    lines += [f"  ⧗ {item.note}（留给闸门）" for item in gates]
+    return ok, lines, [(item.note, "✓" if passed else "✗", spec) for item, passed, spec in results] + [(item.note, "闸门", "留给人拍板") for item in gates]
 
 
-def add_material(task: Run, rel: str, fields: str) -> None:
-    task.append(MATERIALS, f"`{rel}`　{fields}　（{now()}）")
-    task.record("材料", rel)
+def write_report(run: Run, results: list, gates: list) -> Path:
+    """报告：执行记录（每步一行）+ 闸门项（留给人）。"""
+    lines = [f"# 报告：{run.name}", "", "## 执行记录", ""]
+    for event in run.events():
+        mark = "✓" if event.get("ok") else "✗"
+        lines.append(f"- {mark} {event['at']}　{event['step']}　{event['detail']}")
+    lines += ["", "## 闸门项", ""]
+    lines += [f"- ⧗ {item.note}（留给闸门）" for item in gates] or ["- （暂无）"]
+    path = run.record_file(REPORT)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
 
 
-def write_instruction(task: Run, goal: str) -> None:
-    """写出指令骨架：目标填上，步骤与验收留给你写。"""
-    task.write(TASK_FILE, records.task_template(task.name, goal or "<要什么，一句话>"))
-    task.record("指令", goal or "写指令（步骤与验收待填）")
-
-
-def review(task: Run, root: Path) -> tuple[bool, list[str]]:
-    """跑契约的机械核对，结果写进报告的审查者报告，并记流水。"""
-    from . import report
-
-    if not task.file(TASK_FILE).is_file():
-        return False, ["还没有指令"]
-    result = report.audit_instruction(root, task.file(TASK_FILE))
-    body = [f"{'✓' if mark == '✓' else '✗'} {note}" for note, mark, _ in result.rows if mark != "闸门"]
-    body += [f"⧗ {note}（留给闸门）" for note, mark, _ in result.rows if mark == "闸门"]
-    task.fill_in(task.record_file(REPORT), "审查者报告", body)
-    task.record("核对", f"机械核对 {len(result.rows)} 项", ok=result.ok)
-    return result.ok, result.lines
-
-
-def add_output(task: Run, rel: str) -> None:
-    task.append_in(task.record_file(REPORT), "生成者产出", f"`{rel}`　（{now()}）")
-    task.record("产出", rel)
-
-
-def decide(task: Run, words: str) -> None:
-    task.fill_in(task.record_file(REPORT), "人类裁决", [words])
-    task.record("裁决", words)
-
-
-def finish(task: Run) -> list[str]:
-    """收尾：把生成者产出收束成最终成果。"""
-    body = task.report().get("生成者产出", [])
-    task.fill_in(task.record_file(REPORT), "最终成果", body or ["（没有产出可收）"])
-    task.record("成果", f"{len(body)} 项")
-    return body
-
-
-def narrate(task: Run, words: str) -> None:
+def narrate(run: Run, words: str) -> None:
     """历史只收叙事：一段一段往下写。"""
-    path = task.record_file(HISTORY)
-    text = path.read_text(encoding="utf-8") if path.is_file() else records.history_template(task.name)
+    path = run.record_file(HISTORY)
+    text = path.read_text(encoding="utf-8") if path.is_file() else records.history_template(run.name)
     text = "\n".join(line for line in text.splitlines() if not (line.strip().startswith("（") and line.strip().endswith("）"))).rstrip()
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"{text}\n\n{words.strip()}\n", encoding="utf-8")
-    task.record("历史", words.strip()[:40])
+    run.record("历史", words.strip()[:40])
 
 
-def state_line(task: Run) -> str:
-    """给界面用的一句人话。"""
-    action, hint = task.next_action()
-    return hint if action == "完成" else f"下一步：{action}——{hint}"
+def state_line(run: Run) -> str:
+    step = run.next_step()
+    total = len(run.steps())
+    if not total:
+        return "工作流里还没有步骤——在 workflow.md 里写「- 步骤名 → tasks/步骤名.md」"
+    return f"下一步：{step.name}（{step.name} 这一步关联的任务：{step.task}）" if step else f"{total} 个步骤都做过了"
