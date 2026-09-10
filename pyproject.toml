@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "量潮知识工作工具箱：找得到（索引）、看得见（记录）、核得动（判据）"
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.6"]
+
 [project.scripts]
 kg = "kg.cli:main"
 kg-gui = "kg.gui:main"

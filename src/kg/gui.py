@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication,
@@ -104,7 +104,16 @@ class Window(QMainWindow):
         right = QVBoxLayout()
         self.form_host = QWidget()
         self.form = QFormLayout(self.form_host)
+        self.form.setContentsMargins(0, 4, 0, 0)
+        self.form.setHorizontalSpacing(12)
+        self.form.setVerticalSpacing(8)
+        self.form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         right.addWidget(self.form_host)
+
+        self.hint_label = QLabel()
+        self.hint_label.setWordWrap(True)
+        self.hint_label.setStyleSheet("color: #666;")
+        right.addWidget(self.hint_label)
 
         buttons = QHBoxLayout()
         self.run_button = QPushButton("执行")
@@ -123,7 +132,8 @@ class Window(QMainWindow):
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
         self.table.itemDoubleClicked.connect(lambda _: self._open_row(self.table.currentRow()))
         self.stack = QStackedWidget()
         self.stack.addWidget(self.table)
@@ -149,12 +159,15 @@ class Window(QMainWindow):
                 widget = self._with_browse(field)
             else:
                 widget = QLineEdit()
-                widget.setPlaceholderText(self.spec.hint if field == "材料路径" else field)
+                widget.setPlaceholderText("留空看全部；多个用空格分开" if field == "材料路径" else field)
                 self.widgets[field] = widget
             self.form.addRow(field, widget)
         self.export_button.setVisible(bool(self.spec.export))
+        self.hint_label.setText(self.spec.hint)
         self.show_result(report.Result(lines=[f"{self.spec.name}：{self.spec.hint}"]))
         self.statusBar().showMessage(self.spec.hint)
+        if not self.spec.fields:  # 没有参数的动作（全库、对账）选中就直接出结果
+            self.run_current()
 
     def _with_browse(self, field: str) -> QWidget:
         box = QWidget()
@@ -212,6 +225,11 @@ class Window(QMainWindow):
             for row, values in enumerate(result.rows):
                 for col, value in enumerate(values):
                     self.table.setItem(row, col, QTableWidgetItem(str(value)))
+            self.table.resizeColumnsToContents()
+            header = self.table.horizontalHeader()
+            for col in range(self.table.columnCount()):
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
             self.stack.setCurrentWidget(self.table)
         else:
             self.stack.setCurrentWidget(self.text)

@@ -77,7 +77,11 @@ def cmd_gui(root: Path, args) -> int:
     try:
         from . import gui
     except ImportError:
-        print("界面开不起来——缺 PySide6 或它的窗口模块：pip install PySide6-Essentials（或 sudo apt install python3-pyside6.qtwidgets）")
+        print(
+            "界面开不起来——当前 Python 缺 PySide6 的窗口模块。两种补法：\n"
+            "  1. 实验室内建虚拟环境（推荐，不动系统）：uv venv .venv && uv pip install -e '.[gui]'，然后用 .venv/bin/kg-gui\n"
+            "  2. 用发行版的包：sudo apt install python3-pyside6.qtwidgets"
+        )
         return 2
     return gui.main(["--root", str(root)])
 

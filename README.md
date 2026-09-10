@@ -12,8 +12,13 @@
 uv pip install -e .      # 或装成命令：kg / kg-gui
 ```
 
-界面依赖 PySide6 的窗口模块：`pip install PySide6-Essentials`
-（有些发行版把它拆开了，比如 Debian/Ubuntu 还要 `sudo apt install python3-pyside6.qtwidgets`）。
+界面要 PySide6 的窗口模块——有些发行版把它拆开了（Debian/Ubuntu 上是 `python3-pyside6.qtwidgets`）：
+缺了的话，实验室内建个虚拟环境即可，不动系统：
+
+```bash
+uv venv .venv && uv pip install -e ".[gui]"
+.venv/bin/kg-gui
+```
 
 | 动作 | 干什么 |
 |------|--------|
