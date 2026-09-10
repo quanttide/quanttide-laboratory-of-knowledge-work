@@ -45,17 +45,6 @@ from . import catalog as catalog_layer
 from . import records
 from . import report
 
-STEPS = (
-    ("材料", "material", "记一条材料"),
-    ("指令", "instruction", "写指令：目标 / 步骤 / 验收（判据写在验收里）"),
-    ("核对", "review", "跑机械核对，结果写进案卷"),
-    ("产出", "output", "记一笔产出"),
-    ("裁决", "decision", "写下裁决"),
-    ("成果", "finish", "收尾：产出收束成成果，写进报告"),
-    ("历史", "history", "写这个任务的来龙去脉——报告记事，历史叙事"),
-)
-
-
 # ---- 浏览页：工作区层面的动作 ----
 
 
