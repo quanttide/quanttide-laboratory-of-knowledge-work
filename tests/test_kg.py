@@ -157,16 +157,17 @@ def flow_and_task(real: Path) -> None:
 
         task_layer.run_ai = fake_ai
 
-        started = report.task_new(root, data, "试一次", "试一条", "把纪律落下来")
+        started = report.task_new(root, data, "试一次", "试一条")
         task = task_layer.open_task(root, data, "试一次")
         test("任务：一件任务一个文件，指向工作流", task.file.is_file() and task.workflow_name() == "试一条", task.workflow_name())
         test("任务：状态按工作流列步骤", [row[0] for row in started.rows] == ["定位", "比对", "结论"])
         test("任务：状态里看得到工作流与指令文件",
              any("工作流：试一条" in line for line in started.lines) and any("指令：" in line for line in started.lines),
              str(started.lines[:4]))
-        test("任务文件 = name + workflow + 流水（一个任务一个文件）", set(task.payload()) == {"name", "workflow", "log"}, str(task.payload()))
-        test("流水记在任务文件里（不再另开 jsonl）", task.artifact("log") == task.file and [e["step"] for e in task.events()][:1] == ["开工"], str(task.events()[:1]))
-        test("任务：起时记一笔", len(task.events()) == 1)
+        test("任务文件 = name + start + workflow + 流水", set(task.payload()) == {"name", "start", "workflow", "log"}, str(task.payload()))
+        test("开工记成 start 字段（不是流水里的一步）", task.start() != "" and "开工" not in [e["step"] for e in task.events()], str(task.payload()["start"]))
+        test("流水记在任务文件里（不再另开 jsonl）", task.artifact("log") == task.file, str(task.events()[:1]))
+        test("任务：起时只记 start，不记流水", task.start() != "" and task.events() == [])
         auto = report.task_step(root, data, "试一次", "", auto=True)  # 默认执行者是 AI，交给 pi
         test("走一步：默认交给智能体跑", bool(calls) and "这一步：定位" in calls[0], str(calls[:1])[:60])
         test("走一步：AI 干活也记一笔", any("AI 执行" in e["detail"] for e in task.events()), str(task.events()[-1:]))
@@ -183,7 +184,7 @@ def flow_and_task(real: Path) -> None:
         step = report.task_step(root, data, "试一次", "比对", "比完了")
         test("走一步：判据通过", step.ok and any(row[1] == "✓" for row in step.rows), str(step.rows))
         test("走一步：闸门列出来", any(row[1] == "闸门" for row in step.rows))
-        test("走一步：记账了", len(task.events()) == 3, f"实得 {len(task.events())}")
+        test("走一步：记账了", len(task.events()) == 2, f"实得 {len(task.events())}")
         test("走一步：下一步只剩结论", task.next_step().name == "结论")
 
         written = task.artifact("report").read_text(encoding="utf-8")
@@ -272,13 +273,13 @@ def gui_smoke(real: Path) -> None:
         desk = gui.Desk(fake, data)
         test("台面：没有运行时提示新建", "新建" in desk.next_label.text())
         flow_layer.create(data, "试一条", ["材料", "核对"], "把纪律落下来")
-        task_layer.create(fake, data, "试一次", "试一条", "把纪律落下来")
+        task_layer.create(fake, data, "试一次", "试一条")
         desk.reload()
         test("台面：步骤表按工作流列出", desk.steps_table.rowCount() == 2 and desk.steps_table.item(0, 2).text() == "—")
         desk.selected_step()
         report.task_step(fake, data, "试一次", "材料", "记了一条")
         desk.reload()
-        test("台面：状态跟着走", desk.steps_table.item(0, 2).text() == "✓" and desk.log_table.rowCount() >= 2)
+        test("台面：状态跟着走", desk.steps_table.item(0, 2).text() == "✓" and desk.log_table.rowCount() >= 1, str(desk.log_table.rowCount()))
     window.close()
     del app
 

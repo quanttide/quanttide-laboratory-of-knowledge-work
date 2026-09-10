@@ -486,8 +486,7 @@ class Desk(QWidget):
         flow, ok = QInputDialog.getItem(self, "起一件任务", "跑哪条工作流", flows, 0, False)
         if not ok or not flow:
             return
-        about, ok = QInputDialog.getText(self, "起一件任务", "这一次要什么（可留空）")
-        self.task = task_layer.create(self.root, self.data, name.strip(), flow, about.strip() if ok else "")
+        self.task = task_layer.create(self.root, self.data, name.strip(), flow)
         self.reload()
         self.window().statusBar().showMessage(f"起了：{self.task.file}")
 

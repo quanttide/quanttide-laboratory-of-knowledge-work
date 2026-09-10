@@ -199,13 +199,13 @@ def workflow_list(data: Path) -> Result:
     return result
 
 
-def task_new(root: Path, data: Path, name: str, workflow: str, about: str = "") -> Result:
+def task_new(root: Path, data: Path, name: str, workflow: str) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先给这件任务起个名字"])
     flow = flow_layer.open_workflow(data, workflow)
     if not flow.exists():
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}（kg workflow --list 看有哪些）"])
-    task = task_layer.create(root, data, name.strip(), workflow.strip(), about)
+    task = task_layer.create(root, data, name.strip(), workflow.strip())
     result = task_status(root, data, name.strip())
     result.lines.insert(0, f"起了：{short(data, task.file)}")
     return result
@@ -219,6 +219,7 @@ def task_status(root: Path, data: Path, name: str) -> Result:
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     done = task.done()
     result = Result(columns=("步骤", "状态"), lines=[f"任务：{task.name}"])
+    result.lines.append(f"  开工：{task.start() or '（没记）'}")
     result.lines.append(f"  工作流：{task.workflow_name()}——{task.workflow().description}")
     result.lines.append(f"  步骤：{len(task.steps())} 个")
     for step in task.steps():

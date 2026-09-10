@@ -64,6 +64,10 @@ class Task:
     def exists(self) -> bool:
         return self.file.is_file()
 
+    def start(self) -> str:
+        """开工时间：任务自己的属性，不是流水里的一步。"""
+        return str(self.payload().get("start", "")).strip()
+
     def payload(self) -> dict:
         if not self.file.is_file():
             return {}
@@ -106,7 +110,7 @@ class Task:
         return str(path.relative_to(self.data)) if path.is_relative_to(self.data) else str(path)
 
 
-def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "") -> Task:
+def create(root: Path, data: Path, name: str, workflow_name: str) -> Task:
     """起一件任务：写下指令（跑哪条工作流、要什么），备好产物三家。"""
     task = Task(root, Path(data), name)
     task.file.parent.mkdir(parents=True, exist_ok=True)
@@ -114,12 +118,11 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     for kind in (REPORT, JOURNAL):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(dump({"name": name, "workflow": workflow_name, "log": []}), encoding="utf-8")
+        task.file.write_text(dump({"name": name, "start": now(), "workflow": workflow_name, "log": []}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(JOURNAL).is_file():
         task.artifact(JOURNAL).write_text(records.journal_template(name), encoding="utf-8")
-    task.record("开工", about or f"跑工作流：{workflow_name}")
     return task
 
 
@@ -139,7 +142,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 
 工作区：{task.root}
 数据仓：{task.data}
-任务：{task.name}（工作流的一次执行）
+任务：{task.name}（开工：{task.start()}）
 工作流：{task.workflow_name()}——{task.workflow().description}
 步骤：{steps}
 这一步：{step.name}

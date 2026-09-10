@@ -9,7 +9,7 @@
 ```text
 data/
 ├── workflows/<工作流>.yaml      工作流：串联的步骤（name / what / executor / judges）
-├── tasks/<任务>.yaml            任务：工作流的一次执行（name、workflow、log 流水）——一个任务一个文件
+├── tasks/<任务>.yaml            任务：工作流的一次执行（name、start、workflow、log 流水）——一个任务一个文件
 └── artifacts/                 产物按类型分家，按任务名命名（可维护）
     ├── report/<任务>.md        报告：程序只维护「执行记录」「闸门项」两节，别的节归人 / AI
     └── journal/<任务>.md       日志（叙事）：这次工作的来龙去脉

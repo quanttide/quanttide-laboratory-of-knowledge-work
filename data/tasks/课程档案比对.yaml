@@ -1,10 +1,7 @@
 name: 课程档案比对
+start: 2026-09-10 21:43
 workflow: 课程档案比对
 log:
-- at: 2026-09-10 21:43
-  step: 开工
-  detail: 比对 work 侧个人课程档案与课程研发档案，看两边口径与缺口
-  ok: true
 - at: 2026-09-10 21:44
   step: 定位
   detail: work 侧 3 件、course 侧 3 门课

@@ -1,10 +1,7 @@
 name: 数据归仓
+start: 2026-09-10 21:23
 workflow: 数据归仓
 log:
-- at: 2026-09-10 21:23
-  step: 开工
-  detail: 所有数据放实验室 data/，禁止过滤
-  ok: true
 - at: 2026-09-10 21:23
   step: 材料
   detail: AGENTS.md、日志
