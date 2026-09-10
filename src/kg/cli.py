@@ -86,18 +86,18 @@ def cmd_audit_instruction(root: Path, args) -> int:
 def cmd_run(root: Path, args) -> int:
     data = Path(args.data)
     if args.list:
-        return emit(report.run_list(root, data, args.runs))
+        return emit(report.run_list(root, data))
     if args.new:
         steps = [item.strip() for item in args.steps.split(",") if item.strip()] if args.steps else None
-        return emit(report.run_new(root, args.name or "", data, steps, args.runs, args.about))
+        return emit(report.run_new(root, args.name or "", data, steps, args.about))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg run <名字>，或 kg run --list / --new <名字>"]))
     if args.history is not None:
-        return emit(report.run_history(root, args.name, args.history if isinstance(args.history, str) else "", data, args.runs))
+        return emit(report.run_history(root, args.name, args.history if isinstance(args.history, str) else "", data))
     if args.done is not None:
         note = args.note or ""
-        return emit(report.run_step(root, args.name, args.done if isinstance(args.done, str) else "", note, data, args.runs))
-    return emit(report.run_status(root, args.name, data, args.runs))
+        return emit(report.run_step(root, args.name, args.done if isinstance(args.done, str) else "", note, data))
+    return emit(report.run_status(root, args.name, data))
 
 
 def cmd_audit_report(root: Path, args) -> int:
@@ -153,7 +153,6 @@ def build_parser() -> argparse.ArgumentParser:
     runner.add_argument("--new", action="store_true", help="起一次运行")
     runner.add_argument("--about", default="", metavar="一句话", help="这一次要什么")
     runner.add_argument("--steps", default="", metavar="甲,乙,丙", help="起运行时写步骤清单（留空用七个常见步骤）")
-    runner.add_argument("--runs", metavar="目录", help="现场放哪（默认 <数据仓>/runs）")
     runner.add_argument("--done", nargs="?", const=True, metavar="步骤", help="执行这一步")
     runner.add_argument("--note", default="", metavar="一句话", help="记一句这一步做了什么")
     runner.add_argument("--history", nargs="?", const=True, metavar="一段话", help="历史：写下这一次的来龙去脉")

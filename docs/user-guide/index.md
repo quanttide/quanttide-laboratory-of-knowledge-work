@@ -16,12 +16,13 @@ uv pip install -e .       # 或装成命令：kg / kg-gui
 程序**不预置编排**。一次运行的工作流写在自己的现场里：
 
 ```text
-runs/<名字>/
-├── workflow.md        步骤清单：- 步骤名 → tasks/<步骤名>.md
-├── tasks/<步骤名>.md   每步关联的任务（目标 / 步骤 / 验收）
-└── log.jsonl          执行记录
-report/<名字>.md       报告（事件）：执行记录 + 闸门项，机器写
-history/<名字>.md      历史（叙事）：人写
+data/
+├── workflows/<运行>.md          工作流：步骤清单（- 步骤 → tasks/<运行>/步骤.md）
+├── tasks/<运行>/<步骤>.md        任务：目标 / 步骤 / 验收
+└── artifacts/<运行>/
+    ├── log.jsonl              执行记录
+    ├── report.md              报告（事件）：执行记录 + 闸门项
+    └── history.md             历史（叙事）
 ```
 
 任务的三段是手册的写法：**目标 / 步骤 / 验收**；判据（机械的、闸门的）写在验收里。
@@ -30,14 +31,14 @@ history/<名字>.md      历史（叙事）：人写
 
 ```bash
 $ kg run --new 数据归仓 --about "所有数据放实验室 data/" --steps 材料,指令,核对,产出,裁决,成果,历史
-起了：…/examples/default/data/runs/数据归仓
-  — 材料 → tasks/材料.md
-  — 指令 → tasks/指令.md
+起了：…/examples/default/data/workflows/数据归仓.md
+  — 材料 → tasks/数据归仓/材料.md
+  — 指令 → tasks/数据归仓/指令.md
   …
 
 $ kg run 数据归仓 --done 材料 --note "AGENTS.md、日志"
 ✓ 材料：AGENTS.md、日志
-下一步：指令（这一步关联的任务：tasks/指令.md）
+下一步：指令（这一步关联的任务：tasks/数据归仓/指令.md）
 
 $ kg run 数据归仓 --done 核对
 ✓ 核对：机械：日志在（path:data/journal/README.md）

@@ -8,11 +8,15 @@
 
 ```text
 data/
-├── runs/       一次运行的现场：workflow.md（步骤清单）、tasks/<步骤>.md（任务：目标 / 步骤 / 验收）、log.jsonl
-├── report/     报告（侧重事件）：生成者产出 / 审查者报告 / 人类裁决 / 最终成果
-├── history/    历史（侧重叙事）：这个任务的来龙去脉，人写
-└── samples/    判例：真实指令与真实报告
+├── workflows/<运行>.md          工作流：步骤清单（- 步骤 → tasks/<运行>/步骤.md）
+├── tasks/<运行>/<步骤>.md        任务：目标 / 步骤 / 验收
+└── artifacts/<运行>/
+    ├── log.jsonl              执行记录
+    ├── report.md              报告（事件）：执行记录 + 闸门项
+    └── history.md             历史（叙事）
 ```
+
+目录按领域模型分三家：workflows（过程·定义侧）、tasks（过程·执行侧）、artifacts（产物）。
 
 程序默认就写在这里（`kg --data`，缺省即本仓 `data/`）；要写别处必须显式指路。
 

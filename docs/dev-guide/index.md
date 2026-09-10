@@ -18,7 +18,7 @@ src/kg/
 └── __main__.py  python3 -m kg
 
 tests/test_kg.py       自带测试，34 项（装 PySide6 窗口模块则多 8 项界面冒烟），不依赖 pytest
-data/                  所有数据（工作纪律）：runs/ 现场（workflow.md + tasks/ + log.jsonl）、report/ 事件、history/ 叙事、samples/ 判例
+data/                  所有数据（工作纪律），按领域模型分三家：workflows/ 工作流、tasks/ 任务、artifacts/ 产物
 kg / kg-gui            本目录下的启动器（不必安装）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```
@@ -51,7 +51,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 四种判据——`path:` 存在、`absent:` 不存在、`contains:` 含某段文字、`run:` 命令退出码为零；路径相对工作区根，写绝对路径则按绝对路径（跨仓库核对用）。没有判据的条目是闸门项，原样列给人拍板。
 
-**③ 抽样自证** —— `kg audit-contract data/samples/migration.md` 与 `kg audit-report data/samples/report.md` 当场核对通过：格式在真事上验证过，不是只在样例上成立。
+**③ 抽样自证** —— `kg audit-instruction data/tasks/文档迁移/搬运.md` 与 `kg audit-report data/artifacts/文档迁移/report.md` 当场核对通过：格式在真事上验证过，不是只在样例上成立。
 
 **④ 测试与打包** —— `python3 tests/test_kg.py` 17 项全通过（真工作区当集成夹具、临时目录当单元夹具）；`pyproject.toml` 一装就是 `kg` 命令，本目录下 `./kg` 也能跑。
 
@@ -59,7 +59,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 **⑥ 审计与导出** —— `kg audit --json 报告.json` 落出「结果 / 缺资产 / 未登记」；`kg catalog --json`、`kg material --json` 同理，给别的程序读。
 
-**⑦ 工作流与运行成为主界面** —— 程序不预置编排：一次运行的工作流写在自己的现场（`runs/<名字>/workflow.md`），步骤逐个关联任务（`tasks/<步骤>.md`，三段：目标 / 步骤 / 验收）；人执行的是任务，`kg run <名字> --done <步骤>` 跑该任务的验收判据、记一笔流水、刷新报告。窗口的「台面」就是这张步骤表加一个「执行这一步」。不做判例累积（按用户决定，减工程量）。
+**⑦ 工作流与运行成为主界面** —— 程序不预置编排：一次运行的工作流写在 `data/workflows/<运行>.md`（步骤清单），每步关联 `data/tasks/<运行>/<步骤>.md`（三段：目标 / 步骤 / 验收）；人执行的是任务，`kg run <名字> --done <步骤>` 跑该任务的验收判据、记一笔流水、刷新 `data/artifacts/<运行>/report.md`。窗口的「台面」就是这张步骤表加一个「执行这一步」。不做判例累积（按用户决定，减工程量）。
 
 ## 待办
 
@@ -67,7 +67,7 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 ## 已决：曾经的重复
 
-`contract/` 与 `dossier/` 原先各有一份 Python 对象版的结构，与程序重复。决定是**删代码、留样本**：结构只由程序拥有（同一套四段写在两处就是两份事实源）；样本搬进 `data/samples/`，判例价值留着，代码的独有能力（判据写进指令文件、`run:` 判据跑命令）没丢。
+`contract/` 与 `dossier/` 原先各有一份 Python 对象版的结构，与程序重复。决定是**删代码、留样本**：结构只由程序拥有（同一套四段写在两处就是两份事实源）；样本搬进数据仓（`data/tasks/文档迁移/`、`data/artifacts/文档迁移/`），判例价值留着，代码的独有能力（判据写进指令文件、`run:` 判据跑命令）没丢。
 
 ## 不做的事
 

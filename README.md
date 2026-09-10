@@ -38,9 +38,9 @@ uv venv .venv && uv pip install -e ".[gui]"
 ## 目录
 
 - `src/kg/` 程序：assets（资产层：二十格与落点）、catalog（目录层）、checks（判据）、material（材料）、records（记录段位与骨架：任务三段、报告四段、历史）、task（任务：状态机、动作、流水）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`runs/` 一次运行的现场（workflow.md + tasks/ + log.jsonl）、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实指令与真实报告
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`），按领域模型分三家：`workflows/` 工作流、`tasks/` 任务、`artifacts/` 产物（log.jsonl、report.md、history.md）
 - `tests/` 自带测试：`python3 tests/test_kg.py`，26 项；装了 PySide6 窗口模块则多 6 项界面冒烟，不依赖 pytest
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`）：`runs/` 一次运行的现场（workflow.md + tasks/ + log.jsonl）、`report/` 报告（事件）、`history/` 历史（叙事）、`samples/` 判例——真实指令与真实报告
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`），按领域模型分三家：`workflows/` 工作流、`tasks/` 任务、`artifacts/` 产物（log.jsonl、report.md、history.md）
 - `docs/` 说明：模式与记录（index.md）、用户指南、开发计划
 
 ## 许可

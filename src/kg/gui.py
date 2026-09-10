@@ -323,11 +323,10 @@ class Browser(QWidget):
 class Desk(QWidget):
     """台面：选一次运行，看步骤与关联的任务，执行一步。"""
 
-    def __init__(self, root: Path, data: Path, runs: Path | None = None):
+    def __init__(self, root: Path, data: Path):
         super().__init__()
         self.root = root
         self.data = data
-        self.runs = runs
         self.run: flow_layer.Run | None = None
         self._build()
         self.reload()
@@ -395,7 +394,7 @@ class Desk(QWidget):
 
     def reload(self) -> None:
         keep = self.run.name if self.run else ""
-        found = flow_layer.listing(self.root, self.data, self.runs)
+        found = flow_layer.listing(self.root, self.data)
         self.picker.blockSignals(True)
         self.picker.clear()
         self.picker.addItems([item.name for item in found])
@@ -408,7 +407,7 @@ class Desk(QWidget):
         self.refresh()
 
     def _picked(self, index: int) -> None:
-        found = flow_layer.listing(self.root, self.data, self.runs)
+        found = flow_layer.listing(self.root, self.data)
         self.run = found[index] if 0 <= index < len(found) else None
         self.refresh()
 
@@ -461,7 +460,7 @@ class Desk(QWidget):
             bar.showMessage("先起一次运行")
             return report.Result(ok=False, lines=["先起一次运行"])
         step = self.selected_step()
-        result = report.run_step(self.root, self.run.name, step, self.note.text().strip(), self.data, str(self.runs) if self.runs else None)
+        result = report.run_step(self.root, self.run.name, step, self.note.text().strip(), self.data)
         self.note.clear()
         self.reload()
         bar.showMessage(result.lines[0] if result.lines else "")
@@ -472,7 +471,7 @@ class Desk(QWidget):
             return
         words, ok = QInputDialog.getMultiLineText(self, "历史", "这一次的来龙去脉（报告记事，历史叙事）")
         if ok and words.strip():
-            report.run_history(self.root, self.run.name, words.strip(), self.data, str(self.runs) if self.runs else None)
+            report.run_history(self.root, self.run.name, words.strip(), self.data)
             self.reload()
 
     def _open_task(self) -> None:
@@ -490,9 +489,9 @@ class Desk(QWidget):
         about, ok = QInputDialog.getText(self, "起一次运行", "这一次要什么（可留空）")
         steps, ok = QInputDialog.getText(self, "起一次运行", "步骤清单，逗号分开（留空用七个常见步骤）")
         chosen = [item.strip() for item in steps.split(",") if item.strip()] if ok else []
-        self.run = flow_layer.create(self.root, name.strip(), self.data, chosen or None, self.runs, about.strip())
+        self.run = flow_layer.create(self.root, name.strip(), self.data, chosen or None, self.data, about.strip())
         self.reload()
-        self.window().statusBar().showMessage(f"起了：{self.run.dir}")
+        self.window().statusBar().showMessage(f"起了：{self.run.workflow_file}")
 
 
 class Window(QMainWindow):
@@ -502,7 +501,6 @@ class Window(QMainWindow):
         self.resize(1040, 660)
         self.root = root or assets_layer.repo_root()
         self.data = data or flow_layer.lab_data()
-        self.runs = runs
 
         body = QWidget()
         self.setCentralWidget(body)
@@ -522,7 +520,7 @@ class Window(QMainWindow):
         top.addWidget(self.data_label)
         outer.addLayout(top)
 
-        self.desk = Desk(self.root, self.data, runs)
+        self.desk = Desk(self.root, self.data)
         self.browser = Browser(self.root)
         tabs = QTabWidget()
         tabs.addTab(self.desk, "台面")
@@ -556,8 +554,7 @@ def main(argv: list[str] | None = None) -> int:
     window = Window(
         Path(args.root).resolve() if args.root else None,
         Path(args.data).resolve() if args.data else None,
-        Path(args.runs).resolve() if args.runs else None,
-    )
+            )
     window.show()
     return app.exec()
 

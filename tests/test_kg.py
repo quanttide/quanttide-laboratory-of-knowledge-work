@@ -138,11 +138,11 @@ def runs(real: Path) -> None:
         (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
         (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
         data = Path(tmp) / "data"
-        started = report.run_new(root, "试一次", data, ["材料", "核对", "历史"], None, "把纪律落下来")
+        started = report.run_new(root, "试一次", data, ["材料", "核对", "历史"], "把纪律落下来")
         test("起运行：步骤表就是工作流写的顺序", [row[0] for row in started.rows] == ["材料", "核对", "历史"], str(started.rows))
 
         run = flow_layer.open_run(root, "试一次", data)
-        test("现场有工作流文件", (data / "runs" / "试一次" / "workflow.md").is_file())
+        test("数据按三家分放", (data / "workflows" / "试一次.md").is_file() and (data / "tasks" / "试一次").is_dir() and (data / "artifacts" / "试一次").is_dir())
         test("每步关联一个任务（三段骨架）", all(set(records.read_sections(run.task_of(s.name))) >= set(records.TASK_SECTIONS) for s in run.steps()))
         test("起运行时记录一笔", len(run.events()) == 1)
 
@@ -155,19 +155,19 @@ def runs(real: Path) -> None:
         test("执行一步：记账了", len(run.events()) == 3, f"实得 {len(run.events())}")
         test("执行一步：下一步跳到历史", run.next_step().name == "历史", str(run.next_step()))
 
-        written = (data / "report" / "试一次.md").read_text(encoding="utf-8")
+        written = (data / "artifacts" / "试一次" / "report.md").read_text(encoding="utf-8")
         test("报告：执行记录写下来了", "## 执行记录" in written and "核对" in written)
         test("报告：闸门项留给人", "## 闸门项" in written and "⧗" in written)
-        test("报告：段位就是 records 说的", records.missing_sections(data / "report" / "试一次.md", records.REPORT_SECTIONS) == [])
+        test("报告：段位就是 records 说的", records.missing_sections(data / "artifacts" / "试一次" / "report.md", records.REPORT_SECTIONS) == [])
 
         test("列运行：还剩历史没做", report.run_list(root, data).rows[0][1] == "历史")
         report.run_history(root, "试一次", "先有纪律，再有工具。", data)
-        test("历史：叙事进 history", records.prose(data / "history" / "试一次.md") != "")
+        test("历史：叙事进 artifacts", records.prose(data / "artifacts" / "试一次" / "history.md") != "")
         test("历史写完：这一步也算做过", report.run_list(root, data).rows[0][1] == "做完")
         test("执行不认得的步骤就报错", not report.run_step(root, "试一次", "乱来", "", data).ok)
 
         # 报告与历史进的是工作区外的实验室数据仓
-        test("数据落在数据仓里", (data / "report" / "试一次.md").is_relative_to(data) and run.dir.is_relative_to(data / "runs"))
+        test("数据全落在数据仓的三家里", run.workflow_file.is_relative_to(data / "workflows") and run.tasks_dir.is_relative_to(data / "tasks") and run.artifacts_dir.is_relative_to(data / "artifacts"))
 
 
 def links(real: Path) -> None:
@@ -200,7 +200,7 @@ def gui_smoke(real: Path) -> None:
     browser.select_action("审计")
     test("界面：审计通过", browser.run_current().ok)
     browser.select_action("核对指令")
-    browser.widgets["指令文件"].setText(str(LAB / "data" / "samples" / "migration.md"))
+    browser.widgets["指令文件"].setText(str(LAB / "data" / "tasks" / "文档迁移" / "搬运.md"))
     audit = browser.run_current()
     test("界面：核对真实指令", audit.ok and len(audit.rows) >= 2, f"行 {len(audit.rows)}")
     browser.select_action("找文档")
@@ -214,7 +214,7 @@ def gui_smoke(real: Path) -> None:
         data = Path(tmp) / "data"
         desk = gui.Desk(fake, data)
         test("台面：没有运行时提示新建", "新建" in desk.next_label.text())
-        flow_layer.create(fake, "试一次", data, ["材料", "核对"], None, "把纪律落下来")
+        flow_layer.create(fake, "试一次", data, ["材料", "核对"], "把纪律落下来")
         desk.reload()
         test("台面：步骤表按工作流列出", desk.steps_table.rowCount() == 2 and desk.steps_table.item(0, 2).text() == "—")
         desk.selected_step()

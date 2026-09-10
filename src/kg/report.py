@@ -211,30 +211,30 @@ def audit_report(target: Path) -> Result:
 # ---- 主轴：工作流的一次运行 ----
 
 
-def run_new(root: Path, name: str, data: Path, steps: list[str] | None = None, runs: str | None = None, about: str = "") -> Result:
+def run_new(root: Path, name: str, data: Path, steps: list[str] | None = None, about: str = "") -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先给这一次起个名字"])
-    run = flow_layer.create(root, name.strip(), data, steps, runs, about)
-    result = run_status(root, name.strip(), data, runs)
-    result.lines.insert(0, f"起了：{run.dir}")
+    run = flow_layer.create(root, name.strip(), data, steps, about)
+    result = run_status(root, name.strip(), data)
+    result.lines.insert(0, f"起了：{short(root, run.workflow_file)}")
     return result
 
 
-def run_status(root: Path, name: str, data: Path, runs: str | None = None) -> Result:
+def run_status(root: Path, name: str, data: Path) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先选一次运行（kg run --list 看有哪些）"])
-    run = flow_layer.open_run(root, name, data, runs)
+    run = flow_layer.open_run(root, name, data)
     if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{run.dir}"])
+        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
     done = run.done()
     result = Result(columns=("步骤", "关联的任务", "状态"))
-    result.lines = [f"运行：{run.name}（{run.dir}）"]
+    result.lines = [f"运行：{run.name}（工作流：{short(root, run.workflow_file)}）"]
     for step in run.steps():
         state = "✓" if step.name in done else "—"
         result.rows.append((step.name, step.task, state))
         result.lines.append(f"  {state} {step.name} → {step.task}")
     result.lines.append(flow_layer.state_line(run))
-    result.lines.append(f"报告：{short(root, run.record_file(flow_layer.REPORT))}　历史：{short(root, run.record_file(flow_layer.HISTORY))}")
+    result.lines.append(f"产物：{short(root, run.artifact(flow_layer.REPORT))}、{short(root, run.artifact(flow_layer.HISTORY))}")
     events = run.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")
@@ -242,24 +242,24 @@ def run_status(root: Path, name: str, data: Path, runs: str | None = None) -> Re
     return result
 
 
-def run_list(root: Path, data: Path, runs: str | None = None) -> Result:
-    found = flow_layer.listing(root, data, runs)
+def run_list(root: Path, data: Path) -> Result:
+    found = flow_layer.listing(root, data)
     result = Result(columns=("运行", "下一步", "位置"))
     for run in found:
         step = run.next_step()
-        result.rows.append((run.name, step.name if step else "做完", short(root, run.dir)))
+        result.rows.append((run.name, step.name if step else "做完", short(root, run.workflow_file)))
         result.lines.append(f"{run.name:24} 下一步：{step.name if step else '做完'}")
     if not found:
         result.lines = ["还没有运行：kg run --new <名字>"]
     return result
 
 
-def run_step(root: Path, name: str, step: str, note: str = "", data: Path | None = None, runs: str | None = None) -> Result:
+def run_step(root: Path, name: str, step: str, note: str = "", data: Path | None = None) -> Result:
     """执行一个步骤：做它关联的任务一次，记账。"""
     data = data or flow_layer.lab_data()
-    run = flow_layer.open_run(root, name, data, runs)
+    run = flow_layer.open_run(root, name, data)
     if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{run.dir}"])
+        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
     if not step.strip():
         return Result(ok=False, lines=["请给步骤名（kg run <名字> 看有哪些步骤）"])
     ok, lines, rows = flow_layer.execute(run, root, step.strip(), note)
@@ -268,12 +268,12 @@ def run_step(root: Path, name: str, step: str, note: str = "", data: Path | None
     return result
 
 
-def run_history(root: Path, name: str, words: str, data: Path | None = None, runs: str | None = None) -> Result:
+def run_history(root: Path, name: str, words: str, data: Path | None = None) -> Result:
     data = data or flow_layer.lab_data()
-    run = flow_layer.open_run(root, name, data, runs)
+    run = flow_layer.open_run(root, name, data)
     if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{run.dir}"])
+        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
     if not words.strip():
-        return Result(ok=False, lines=[f"历史要人来写：{short(root, run.record_file(flow_layer.HISTORY))}"])
+        return Result(ok=False, lines=[f"历史要人来写：{short(root, run.artifact(flow_layer.HISTORY))}"])
     flow_layer.narrate(run, words)
-    return Result(lines=[f"历史记下一段：{short(root, run.record_file(flow_layer.HISTORY))}", flow_layer.state_line(run)])
+    return Result(lines=[f"历史记下一段：{short(root, run.artifact(flow_layer.HISTORY))}", flow_layer.state_line(run)])
