@@ -14,11 +14,11 @@ src/kg/
 ├── checks.py    判据：解析指令「验收」段里的机械核对并执行
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
 ├── records.py   记录的段位与骨架：任务三段（目标 / 步骤 / 验收）、报告四段（事件）、历史（叙事）
-├── task.py      任务：任务目录（在飞）、七个标准任务的状态机、动作、流水；报告进 data/report、历史进 data/history
+├── task.py      任务：工作流的一次执行（状态、走一步、流水、报告、历史）
 └── __main__.py  python3 -m kg
 
-tests/test_kg.py       自带测试，34 项（装 PySide6 窗口模块则多 8 项界面冒烟），不依赖 pytest
-data/                  所有数据（工作纪律），按领域模型分三家：workflows/ 工作流、tasks/ 任务、artifacts/ 产物
+tests/test_kg.py       自带测试，30 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
+data/                  所有数据（工作纪律），按领域模型分三家：workflows/ 工作流定义、tasks/ 任务实例、artifacts/ 产物
 kg / kg-gui            本目录下的启动器（不必安装）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```

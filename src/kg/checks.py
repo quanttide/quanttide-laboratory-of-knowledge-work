@@ -35,12 +35,12 @@ class Item:
         return self.spec is not None
 
 
-def parse(text: str, section: str = "验收") -> list[Item]:
-    """抽出某一节里的判据条目（任务的指令里，判据住在「验收」）。"""
+def parse(text: str, section: str | None = "验收") -> list[Item]:
+    """抽出某一节里的判据条目；section=None 表示整段都是判据（步骤的验收）。"""
     items: list[Item] = []
-    inside = False
+    inside = section is None
     for line in text.splitlines():
-        if line.startswith("## "):
+        if line.startswith("## ") and section is not None:
             inside = line[3:].strip() == section
             continue
         if not inside:

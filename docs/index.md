@@ -18,7 +18,7 @@
 
 **历史**（侧重叙事）：这个任务的来龙去脉，落在 `data/history/`，由人写。
 
-## 工作流与运行
+## 工作流与任务
 
 **工作流**是过程的编排定义——一串步骤，每个步骤关联一个任务（`specification/process/workflow.md`）。
 **任务**是干活的单位：目标 / 步骤 / 验收（`specification/process/task.md`）。

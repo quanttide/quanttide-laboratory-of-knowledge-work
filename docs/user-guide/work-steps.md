@@ -15,25 +15,27 @@ grep -rln "课程研发" /home/iguo/repos/quanttide    # 另一边在别的仓�
 ## 2 立流程
 
 ```bash
-kg run --new 课程档案比对 --about "比对 work 侧个人课程档案与课程研发档案" --steps 定位,比对,结论
+kg workflow --new 课程档案比对 --steps 定位,比对,结论 --note "比对两边的档案"
 ```
 
-一次运行的数据按三家落地：
+数据按三家落地：
 
 ```text
-data/workflows/课程档案比对.md            步骤清单（每步指向一个任务）
-data/tasks/课程档案比对/{定位,比对,结论}.md  每步的任务
-data/artifacts/课程档案比对/              log.jsonl、report.md、history.md
+data/workflows/课程档案比对.md     工作流：串联的步骤（每步自带判据）
+data/tasks/课程档案比对.md         任务：这一次的执行（跑哪条工作流、要什么）
+data/artifacts/课程档案比对/       产物：log.jsonl、report.md、history.md
 ```
 
-步骤清单是**这一次**的：写在这份文件里，程序不预置。
+工作流是**数据不是代码**：步骤写在这份文件里，程序不预置。
 
-## 3 写任务
+## 3 写步骤的判据
 
-每一步一份任务，三段齐全——**目标 / 步骤 / 验收**。判据写进验收，不写进代码：
+工作流里每步一段，判据写在步骤下面——不写进代码：
 
 ```markdown
-## 验收
+### 定位
+
+- 做什么：把两边的源找齐
 - [ ] 机械：个人课程档案在 `path:data/profile/iGuo/course/index.md`
 - [ ] 机械：课程研发档案在 `path:/…/quanttide-course/data/profile/README.md`
 - [ ] 闸门：创始人点头（回流与并法怎么定）
@@ -41,7 +43,12 @@ data/artifacts/课程档案比对/              log.jsonl、report.md、history.
 
 机械的当场判（存在、不存在、含某段文字、跑一条命令）；闸门的列出来留给人。
 
-## 4 干活
+## 4 起一件任务，干活
+
+```bash
+$ kg task --new 课程档案比对 --workflow 课程档案比对 --about "比对 work 侧与课程研发档案"
+起了：…/data/tasks/课程档案比对.md
+```
 
 真正的判断在这儿发生——CLI 不替你想。这次比的四条：口径不同（一边记「为什么这么办」，一边记「课里有什么」）、两边都有的课、各自的缺口、格式差（可机读 vs 散文）。
 
@@ -50,23 +57,21 @@ data/artifacts/课程档案比对/              log.jsonl、report.md、history.
 ## 5 一步一记
 
 ```bash
-$ kg run 课程档案比对 --done 定位 --note "work 侧 3 件、course 侧 3 门课"
+$ kg task 课程档案比对 --done 定位 --note "work 侧 3 件、course 侧 3 门课"
 ✓ 定位：work 侧 3 件、course 侧 3 门课
   ✓ 机械：个人课程档案在（path:data/profile/iGuo/course/index.md）
   ✓ 机械：课程研发档案在（path:/…/course/data/profile/README.md）
-下一步：比对（关联的任务：tasks/课程档案比对/比对.md）
+下一步：比对
 ```
 
-`--done <步骤>` 做三件事：跑那一步任务验收里的机械判据、记一笔流水、刷新报告。没有判据的步骤也能记一笔（`--note` 一句话）。
+`--done <步骤>` 做三件事：跑这一步的机械判据、记一笔流水、刷新报告。没有判据的步骤也能记一笔（`--note` 一句话）。
 
 ## 6 看
 
 ```bash
-$ kg run 课程档案比对
-  ✓ 定位 → tasks/课程档案比对/定位.md
-  ✓ 比对 → tasks/课程档案比对/比对.md
-  ✓ 结论 → tasks/课程档案比对/结论.md
-3 个步骤都做过了
+$ kg task 课程档案比对
+  ✓ 定位   ✓ 比对   ✓ 结论
+3 个步骤都走过了
 
 $ cat data/artifacts/课程档案比对/report.md      # 执行记录 + 闸门项，机器写
 ```
@@ -76,7 +81,7 @@ $ cat data/artifacts/课程档案比对/report.md      # 执行记录 + 闸门�
 闸门项留着等你拍板（这次是「回流与并法怎么定」）；这一趟的来龙去脉写进历史：
 
 ```bash
-kg run 课程档案比对 --history "先找齐两边，再按口径/重叠/缺口/格式差四条比……"
+kg task 课程档案比对 --history "先找齐两边，再按口径/重叠/缺口/格式差四条比……"
 ```
 
 ## 窗口里也一样
@@ -87,5 +92,5 @@ kg run 课程档案比对 --history "先找齐两边，再按口径/重叠/缺�
 
 - **数据全落 `data/`**（workflows / tasks / artifacts 三家），不写实验室外面；
 - **判据写进验收**，模板里的占位（`<…>`）不算判据；
-- **步骤是这一次的**：不预置、不累积；要改顺序或加减步骤，改 `workflows/<运行>.md`；
+- **工作流是数据**：不预置、不累积；改顺序或加减步骤，改 `data/workflows/<工作流>.md`；
 - **别人的仓库不擅动**：course 侧属另一个仓库，动它要授权。

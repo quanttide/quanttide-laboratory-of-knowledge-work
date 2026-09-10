@@ -22,9 +22,12 @@ uv venv .venv && uv pip install -e ".[gui]"
 
 | 动作 | 干什么 |
 |------|--------|
-| `kg run --list` / `--new <名字>` | 任务：有哪些、起一个 |
-| `kg run <名字>` | 看它的七个标准任务的状态、下一步与流水 |
-| `kg run <名字> --material/--contract/--review/--output/--decision/--finish/--history` | 往前走一步，事实自动记进流水 |
+| `kg workflow --new <名字> --steps 甲,乙,丙` | 写一条工作流：步骤串联，每步自带验收判据 |
+| `kg workflow <名字>` / `--list` | 看步骤与判据 / 有哪些工作流 |
+| `kg task --new <名字> --workflow <工作流> [--about …]` | 起一件任务（工作流的一次执行） |
+| `kg task <名字>` / `--list` | 看步骤状态与流水 / 有哪些任务 |
+| `kg task <名字> --done <步骤> [--note 一句话]` | 走这一步：跑它的验收判据、记账、写报告 |
+| `kg task <名字> --history <一段话>` | 历史：写下这一次的来龙去脉（叙事） |
 | `kg find <名字>` | 按名找文档——认文件名与中文标题 |
 | `kg catalog` | 看目录——列全部条目，可导 JSON |
 | `kg audit [--make]` | 审计——资产表有而工作区无、工作区有而资产表无；`--make` 补建缺的格子 |
@@ -38,9 +41,8 @@ uv venv .venv && uv pip install -e ".[gui]"
 ## 目录
 
 - `src/kg/` 程序：assets（资产层：二十格与落点）、catalog（目录层）、checks（判据）、material（材料）、records（记录段位与骨架：任务三段、报告四段、历史）、task（任务：状态机、动作、流水）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`），按领域模型分三家：`workflows/` 工作流、`tasks/` 任务、`artifacts/` 产物（log.jsonl、report.md、history.md）
+- `data/` 所有数据（工作纪律，见 `AGENTS.md`），按领域模型分三家：`workflows/` 工作流（步骤与判据）、`tasks/` 任务（一次执行）、`artifacts/` 产物（log.jsonl、report.md、history.md）
 - `tests/` 自带测试：`python3 tests/test_kg.py`，26 项；装了 PySide6 窗口模块则多 6 项界面冒烟，不依赖 pytest
-- `data/` 所有数据（工作纪律，见 `AGENTS.md`），按领域模型分三家：`workflows/` 工作流、`tasks/` 任务、`artifacts/` 产物（log.jsonl、report.md、history.md）
 - `docs/` 说明：模式与记录（index.md）、用户指南、开发计划
 
 ## 许可

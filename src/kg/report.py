@@ -13,13 +13,13 @@ from pathlib import Path
 
 from . import assets as assets_layer
 from . import catalog as catalog_layer
+from . import task as task_layer
 from . import workflow as flow_layer
 from . import checks as checks_layer
 from . import material as material_layer
 from . import records
 
 MECHANICAL = ("核对", "结论", "说明")
-SECTIONS = ("段位", "结论")
 STEPS = ("material", "instruction", "review", "output", "decision", "finish", "history")
 
 
@@ -29,6 +29,10 @@ class Result:
     lines: list[str] = field(default_factory=list)
     columns: tuple[str, ...] = ()
     rows: list[tuple[str, ...]] = field(default_factory=list)
+
+    def with_first(self, line: str) -> "Result":
+        self.lines.insert(0, line)
+        return self
 
 
 def short(root: Path, path: Path) -> str:
@@ -141,139 +145,101 @@ def material_payload(root: Path, paths: list[str] | None = None) -> dict:
 # ---- 记录：骨架与核对 ----
 
 
-def new_record(target: Path, template: str, about: str = "") -> Result:
-    if not str(target).strip():
-        return Result(ok=False, lines=["请先填写到哪个文件"])
-    if target.exists():
-        return Result(ok=False, lines=[f"已存在：{target}"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(records.contract_template(about) if template == "契约" else template, encoding="utf-8")
-    return Result(lines=[f"已写：{target}"] + ([f"以 `{about}` 为题"] if about else []))
-
-
-def new_instruction(target: Path, goal: str = "") -> Result:
-    if not str(target).strip():
-        return Result(ok=False, lines=["请先写到哪个文件"])
-    if target.exists():
-        return Result(ok=False, lines=[f"已存在：{target}"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(records.task_template(target.stem, goal), encoding="utf-8")
-    return Result(lines=[f"已写：{target}"])
-
-
-def new_report(target: Path, title: str = "") -> Result:
-    return new_record(target, records.report_template(title), title)
-
-
-def audit_instruction(root: Path, target: Path) -> Result:
-    if not str(target).strip():
-        return Result(ok=False, lines=["请先选指令文件"])
-    if not target.is_file():
-        return Result(ok=False, lines=[f"没有这个文件：{target}"])
-    missing = records.missing_sections(target, records.TASK_SECTIONS)
-    result = Result(ok=not missing, columns=MECHANICAL)
-    result.lines += [f"  {'✓' if name not in missing else '✗'} {name}" for name in records.TASK_SECTIONS]
-    if missing:
-        result.lines.append(f"指令不完整：缺 {'、'.join(missing)}")
-        return result
-    empty = [name for name in ("步骤", "验收") if not records.read_sections(target).get(name)]
-    if empty:
-        result.ok = False
-        result.lines.append(f"指令还空着：{'、'.join(empty)}——三段齐全才算写完")
-        return result
-    result.lines.append("指令完整。")
-    results, gates = checks_layer.run(root, checks_layer.parse(target.read_text(encoding="utf-8")))
-    result.rows = [(item.note, "✓" if ok else "✗", detail) for item, ok, detail in results]
-    result.rows += [(item.note, "闸门", "留给人拍板") for item in gates]
-    result.ok = all(ok for _, ok, _ in results)
-    if results:
-        result.lines.append("机械核对：")
-        result.lines += [f"  {'✓' if ok else '✗'} {item.note}（{detail}）" for item, ok, detail in results]
-    if gates:
-        result.lines.append("闸门项（留给人拍板）：")
-        result.lines += [f"  - {item.note}" for item in gates]
-    return result
-
-
-def audit_report(target: Path) -> Result:
-    if not str(target).strip():
-        return Result(ok=False, lines=["请先选报告文件"])
-    if not target.is_file():
-        return Result(ok=False, lines=[f"没有这个文件：{target}"])
-    missing = records.missing_sections(target, records.REPORT_SECTIONS)
-    result = Result(ok=not missing, columns=SECTIONS)
-    result.rows = [(name, "✓" if name not in missing else "✗") for name in records.REPORT_SECTIONS]
-    result.lines += [f"  {mark} {name}" for name, mark in result.rows]
-    result.lines.append("报告完整。" if not missing else f"报告不完整：缺 {'、'.join(missing)}")
-    return result
-
-
-# ---- 主轴：工作流的一次运行 ----
-
-
-def run_new(root: Path, name: str, data: Path, steps: list[str] | None = None, about: str = "") -> Result:
+def workflow_new(data: Path, name: str, steps: list[str], note: str = "") -> Result:
     if not name.strip():
-        return Result(ok=False, lines=["请先给这一次起个名字"])
-    run = flow_layer.create(root, name.strip(), data, steps, about)
-    result = run_status(root, name.strip(), data)
-    result.lines.insert(0, f"起了：{short(root, run.workflow_file)}")
+        return Result(ok=False, lines=["请先给工作流起个名字"])
+    if not steps:
+        return Result(ok=False, lines=["至少给一个步骤：--steps 甲,乙,丙"])
+    flow = flow_layer.create(data, name.strip(), steps, note)
+    return workflow_show(data, name.strip()).with_first(f"写下工作流：{short(data, flow.file)}")
+
+
+def workflow_show(data: Path, name: str) -> Result:
+    flow = flow_layer.open_workflow(data, name)
+    if not flow.exists():
+        return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
+    result = Result(columns=("步骤", "怎么算完"), lines=[f"工作流：{flow.name}（{short(data, flow.file)}）"])
+    for step in flow.steps():
+        judges = len([line for line in step.judges.splitlines() if line.strip()])
+        result.rows.append((step.name, f"{judges} 条判据" if judges else "无判据"))
+        result.lines.append(f"  {step.name}：{judges} 条判据")
     return result
 
 
-def run_status(root: Path, name: str, data: Path) -> Result:
+def workflow_list(data: Path) -> Result:
+    found = flow_layer.listing(data)
+    result = Result(columns=("工作流", "步骤", "位置"), lines=[])
+    for flow in found:
+        result.rows.append((flow.name, "、".join(step.name for step in flow.steps()), short(data, flow.file)))
+        result.lines.append(f"{flow.name:24} 步骤：{'、'.join(step.name for step in flow.steps())}")
+    if not found:
+        result.lines = ["还没有工作流：kg workflow --new <名字> --steps 甲,乙"]
+    return result
+
+
+def task_new(root: Path, data: Path, name: str, workflow: str, about: str = "") -> Result:
     if not name.strip():
-        return Result(ok=False, lines=["请先选一次运行（kg run --list 看有哪些）"])
-    run = flow_layer.open_run(root, name, data)
-    if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
-    done = run.done()
-    result = Result(columns=("步骤", "关联的任务", "状态"))
-    result.lines = [f"运行：{run.name}（工作流：{short(root, run.workflow_file)}）"]
-    for step in run.steps():
+        return Result(ok=False, lines=["请先给这件任务起个名字"])
+    flow = flow_layer.open_workflow(data, workflow)
+    if not flow.exists():
+        return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}（kg workflow --list 看有哪些）"])
+    task = task_layer.create(root, data, name.strip(), workflow.strip(), about)
+    result = task_status(root, data, name.strip())
+    result.lines.insert(0, f"起了：{short(data, task.file)}")
+    return result
+
+
+def task_status(root: Path, data: Path, name: str) -> Result:
+    if not name.strip():
+        return Result(ok=False, lines=["请先选一件任务（kg task --list 看有哪些）"])
+    task = task_layer.open_task(root, data, name)
+    if not task.exists():
+        return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
+    done = task.done()
+    result = Result(columns=("步骤", "状态"), lines=[f"任务：{task.name}（工作流：{task.workflow_name()}）"])
+    for step in task.steps():
         state = "✓" if step.name in done else "—"
-        result.rows.append((step.name, step.task, state))
-        result.lines.append(f"  {state} {step.name} → {step.task}")
-    result.lines.append(flow_layer.state_line(run))
-    result.lines.append(f"产物：{short(root, run.artifact(flow_layer.REPORT))}、{short(root, run.artifact(flow_layer.HISTORY))}")
-    events = run.events()[-5:]
+        result.rows.append((step.name, state))
+        result.lines.append(f"  {state} {step.name}")
+    result.lines.append(task_layer.state_line(task))
+    result.lines.append(f"产物：{short(data, task.artifact(task_layer.REPORT))}、{short(data, task.artifact(task_layer.HISTORY))}")
+    events = task.events()[-5:]
     if events:
         result.lines.append("流水（最近五条）：")
         result.lines += [f"  {e['at']}　{e['step']}　{e['detail']}" for e in events]
     return result
 
 
-def run_list(root: Path, data: Path) -> Result:
-    found = flow_layer.listing(root, data)
-    result = Result(columns=("运行", "下一步", "位置"))
-    for run in found:
-        step = run.next_step()
-        result.rows.append((run.name, step.name if step else "做完", short(root, run.workflow_file)))
-        result.lines.append(f"{run.name:24} 下一步：{step.name if step else '做完'}")
+def task_list(root: Path, data: Path) -> Result:
+    found = task_layer.listing(root, data)
+    result = Result(columns=("任务", "工作流", "下一步"))
+    for task in found:
+        step = task.next_step()
+        result.rows.append((task.name, task.workflow_name(), step.name if step else "走完"))
+        result.lines.append(f"{task.name:24} 工作流 {task.workflow_name()}　下一步：{step.name if step else '走完'}")
     if not found:
-        result.lines = ["还没有运行：kg run --new <名字>"]
+        result.lines = ["还没有任务：kg task --new <名字> --workflow <工作流>"]
     return result
 
 
-def run_step(root: Path, name: str, step: str, note: str = "", data: Path | None = None) -> Result:
-    """执行一个步骤：做它关联的任务一次，记账。"""
-    data = data or flow_layer.lab_data()
-    run = flow_layer.open_run(root, name, data)
-    if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
+def task_step(root: Path, data: Path, name: str, step: str, note: str = "") -> Result:
+    """走一步：做这一步的验收判据，记账。"""
+    task = task_layer.open_task(root, data, name)
+    if not task.exists():
+        return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not step.strip():
-        return Result(ok=False, lines=["请给步骤名（kg run <名字> 看有哪些步骤）"])
-    ok, lines, rows = flow_layer.execute(run, root, step.strip(), note)
+        return Result(ok=False, lines=["请给步骤名（kg task <名字> 看有哪些步骤）"])
+    ok, lines, rows = task_layer.execute(task, root, step.strip(), note)
     result = Result(ok=ok, lines=lines, columns=MECHANICAL, rows=rows)
-    result.lines.append(flow_layer.state_line(run))
+    result.lines.append(task_layer.state_line(task))
     return result
 
 
-def run_history(root: Path, name: str, words: str, data: Path | None = None) -> Result:
-    data = data or flow_layer.lab_data()
-    run = flow_layer.open_run(root, name, data)
-    if not run.exists():
-        return Result(ok=False, lines=[f"没有这一次运行：{short(root, run.workflow_file)}"])
+def task_history(root: Path, data: Path, name: str, words: str) -> Result:
+    task = task_layer.open_task(root, data, name)
+    if not task.exists():
+        return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not words.strip():
-        return Result(ok=False, lines=[f"历史要人来写：{short(root, run.artifact(flow_layer.HISTORY))}"])
-    flow_layer.narrate(run, words)
-    return Result(lines=[f"历史记下一段：{short(root, run.artifact(flow_layer.HISTORY))}", flow_layer.state_line(run)])
+        return Result(ok=False, lines=[f"历史要人来写：{short(data, task.artifact(task_layer.HISTORY))}"])
+    task_layer.narrate(task, words)
+    return Result(lines=[f"历史记下一段：{short(data, task.artifact(task_layer.HISTORY))}", task_layer.state_line(task)])

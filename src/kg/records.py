@@ -8,8 +8,6 @@
 from pathlib import Path
 
 REPORT_SECTIONS = ("执行记录", "闸门项")
-TASK_SECTIONS = ("目标", "步骤", "验收")
-CHECK_SECTION = "验收"  # 判据（机械 / 闸门）住在这儿
 HISTORY_PLACEHOLDER = "（这个任务的来龙去脉，你写）"
 
 REPORT_TEMPLATE = """# 报告：{title}
@@ -25,28 +23,6 @@ HISTORY_TEMPLATE = """# 历史：{title}
 """
 
 
-
-
-TASK_TEMPLATE = """# 任务：{title}
-
-## 目标
-
-{goal}
-
-## 步骤
-
-- <怎么走，一步一步>
-
-## 验收
-
-- [ ] 机械：<能写成断言的> `path:data/journal/README.md`
-- [ ] 闸门：<只能人拍板的>
-"""
-
-
-def task_template(title: str = "", goal: str = "<要什么，一句话>") -> str:
-    """任务的指令：按手册的三段——目标 / 步骤 / 验收；判据（机械/闸门）住在验收里。"""
-    return TASK_TEMPLATE.format(title=title or "<任务的名字>", goal=goal or "<要什么，一句话>")
 
 
 def report_template(title: str = "") -> str:

@@ -22,6 +22,7 @@ from kg import checks as checks_layer  # noqa: E402
 from kg import cli, material as material_layer  # noqa: E402
 from kg import records  # noqa: E402
 from kg import report  # noqa: E402
+from kg import task as task_layer  # noqa: E402
 from kg import workflow as flow_layer  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
@@ -98,76 +99,75 @@ def workspace(real: Path) -> None:
         test("材料：阶段由位置承担", journal.stage == "原始" and profile.stage == "材料")
 
 
-def instruction(real: Path) -> None:
-    """指令与报告：三段、判据、核对。"""
-    with tempfile.TemporaryDirectory() as tmp:
-        target = Path(tmp) / "指令.md"
-        report.new_instruction(target, "改 data/journal/README.md")
-        fresh = target.read_text(encoding="utf-8")
-        test("指令：骨架三段齐全", all(f"## {name}" in fresh for name in records.TASK_SECTIONS))
-        test("指令：以某件东西为题写进目标", "改 data/journal/README.md" in fresh)
-
-        checks_text = """## 验收
+def judges(real: Path) -> None:
+    """判据：机械的当场判，闸门的列出来，模板占位不算。"""
+    text = """## 验收
 
 - [ ] 机械：目标侧文件已就位 `path:data/journal/README.md`
 - [ ] 机械：旧文件已删除 `absent:gone.md`
 - [ ] 闸门：落点与源位置同构
 - [ ] 机械：<占位不算判据> `path:不存在`
 """
-        with tempfile.TemporaryDirectory() as inner:
-            root = Path(inner) / "repo"
-            (root / "data" / "journal").mkdir(parents=True)
-            (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
-            items = checks_layer.parse(checks_text)
-            results, gates = checks_layer.run(root, items)
-            test("判据：机械与闸门分得开，占位不算", len(results) == 2 and len(gates) == 1, f"机械 {len(results)}，闸门 {len(gates)}")
-            (root / "gone.md").write_text("还在\n", encoding="utf-8")
-            failed = [ok for _, ok, _ in checks_layer.run(root, items)[0]]
-            test("判据：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
-
-        good = Path(tmp) / "好指令.md"
-        good.write_text(TASK_OK, encoding="utf-8")
-        audit = report.audit_instruction(real, good)
-        test("核对指令：三段齐全、机械项有结论", audit.ok and len(audit.rows) >= 2, str(audit.lines[:2]))
+    with tempfile.TemporaryDirectory() as inner:
+        root = Path(inner) / "repo"
+        (root / "data" / "journal").mkdir(parents=True)
+        (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
+        items = checks_layer.parse(text)
+        results, gates = checks_layer.run(root, items)
+        test("判据：机械与闸门分得开，占位不算", len(results) == 2 and len(gates) == 1, f"机械 {len(results)}，闸门 {len(gates)}")
+        (root / "gone.md").write_text("还在\n", encoding="utf-8")
+        failed = [ok for _, ok, _ in checks_layer.run(root, items)[0]]
+        test("判据：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
 
 
-def runs(real: Path) -> None:
-    """工作流与运行：步骤关联任务、执行一步、报告与历史。"""
+def flow_and_task(real: Path) -> None:
+    """工作流（串联步骤）与任务（一次执行）。"""
     with tempfile.TemporaryDirectory() as tmp:
-        root = fake_repo(Path(tmp) / "run")
+        root = fake_repo(Path(tmp) / "task")
         (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
         (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
         data = Path(tmp) / "data"
-        started = report.run_new(root, "试一次", data, ["材料", "核对", "历史"], "把纪律落下来")
-        test("起运行：步骤表就是工作流写的顺序", [row[0] for row in started.rows] == ["材料", "核对", "历史"], str(started.rows))
 
-        run = flow_layer.open_run(root, "试一次", data)
-        test("数据按三家分放", (data / "workflows" / "试一次.md").is_file() and (data / "tasks" / "试一次").is_dir() and (data / "artifacts" / "试一次").is_dir())
-        test("每步关联一个任务（三段骨架）", all(set(records.read_sections(run.task_of(s.name))) >= set(records.TASK_SECTIONS) for s in run.steps()))
-        test("起运行时记录一笔", len(run.events()) == 1)
+        report.workflow_new(data, "试一条", ["定位", "比对", "结论"], "看看能不能串起来")
+        flow = flow_layer.open_workflow(data, "试一条")
+        test("工作流：步骤按写的顺序串起来", [s.name for s in flow.steps()] == ["定位", "比对", "结论"])
+        test("工作流：每步自带验收骨架", all("机械：" in s.judges for s in flow.steps()))
 
-        run.task_of("核对").write_text(TASK_OK, encoding="utf-8")
-        first = report.run_step(root, "试一次", "材料", "记了一条", data)
-        test("执行一步：没有判据也能记一笔", first.ok and first.lines[0].startswith("✓ 材料"), str(first.lines[:1]))
-        step = report.run_step(root, "试一次", "核对", "跑了一遍", data)
-        test("执行一步：判据通过", step.ok and any(r[1] == "✓" for r in step.rows), str(step.rows))
-        test("执行一步：闸门项列出来", any(row[1] == "闸门" for row in step.rows))
-        test("执行一步：记账了", len(run.events()) == 3, f"实得 {len(run.events())}")
-        test("执行一步：下一步跳到历史", run.next_step().name == "历史", str(run.next_step()))
+        # 把「比对」这一步的判据换成真的
+        text = flow.file.read_text(encoding="utf-8")
+        text = text.replace("""### 比对
 
-        written = (data / "artifacts" / "试一次" / "report.md").read_text(encoding="utf-8")
-        test("报告：执行记录写下来了", "## 执行记录" in written and "核对" in written)
+- 做什么：<比对这一步做什么>
+- [ ] 机械：<能写成断言的> `path:data/journal/README.md`
+- [ ] 闸门：<只能人拍板的>""", """### 比对
+
+- 做什么：把两边比一遍
+- [ ] 机械：日志在 `path:data/journal/README.md`
+- [ ] 闸门：创始人过目""")
+        flow.file.write_text(text, encoding="utf-8")
+
+        started = report.task_new(root, data, "试一次", "试一条", "把纪律落下来")
+        task = task_layer.open_task(root, data, "试一次")
+        test("任务：一件任务一个文件，指向工作流", task.file.is_file() and task.workflow_name() == "试一条", task.workflow_name())
+        test("任务：状态按工作流列步骤", [row[0] for row in started.rows] == ["定位", "比对", "结论"])
+        test("任务：起时记一笔", len(task.events()) == 1)
+        test("任务：没有判据的步骤（占位不算）直接能记", report.task_step(root, data, "试一次", "定位", "两边都找到了").ok)
+
+        step = report.task_step(root, data, "试一次", "比对", "比完了")
+        test("走一步：判据通过", step.ok and any(row[1] == "✓" for row in step.rows), str(step.rows))
+        test("走一步：闸门列出来", any(row[1] == "闸门" for row in step.rows))
+        test("走一步：记账了", len(task.events()) == 3, f"实得 {len(task.events())}")
+        test("走一步：下一步只剩结论", task.next_step().name == "结论")
+
+        written = task.artifact("report.md").read_text(encoding="utf-8")
+        test("报告：执行记录写下来了", "## 执行记录" in written and "比对" in written)
         test("报告：闸门项留给人", "## 闸门项" in written and "⧗" in written)
-        test("报告：段位就是 records 说的", records.missing_sections(data / "artifacts" / "试一次" / "report.md", records.REPORT_SECTIONS) == [])
 
-        test("列运行：还剩历史没做", report.run_list(root, data).rows[0][1] == "历史")
-        report.run_history(root, "试一次", "先有纪律，再有工具。", data)
-        test("历史：叙事进 artifacts", records.prose(data / "artifacts" / "试一次" / "history.md") != "")
-        test("历史写完：这一步也算做过", report.run_list(root, data).rows[0][1] == "做完")
-        test("执行不认得的步骤就报错", not report.run_step(root, "试一次", "乱来", "", data).ok)
-
-        # 报告与历史进的是工作区外的实验室数据仓
-        test("数据全落在数据仓的三家里", run.workflow_file.is_relative_to(data / "workflows") and run.tasks_dir.is_relative_to(data / "tasks") and run.artifacts_dir.is_relative_to(data / "artifacts"))
+        report.task_history(root, data, "试一次", "先串步骤，再执行。")
+        test("历史：叙事进 artifacts", records.prose(task.artifact("history.md")) != "")
+        test("列任务：报工作流与下一步", report.task_list(root, data).rows[0][1] == "试一条")
+        test("工作流里没有的步骤就报错", not report.task_step(root, data, "试一次", "乱来", "", None) if False else not report.task_step(root, data, "试一次", "乱来").ok)
+        test("数据分三家放", task.file.is_relative_to(data / "tasks") and flow.file.is_relative_to(data / "workflows") and task.artifacts_dir.is_relative_to(data / "artifacts"))
 
 
 def links(real: Path) -> None:
@@ -199,14 +199,10 @@ def gui_smoke(real: Path) -> None:
     test("界面：目录出得了表", bool(browser.run_current().rows))
     browser.select_action("审计")
     test("界面：审计通过", browser.run_current().ok)
-    browser.select_action("核对指令")
-    browser.widgets["指令文件"].setText(str(LAB / "data" / "tasks" / "文档迁移" / "搬运.md"))
-    audit = browser.run_current()
-    test("界面：核对真实指令", audit.ok and len(audit.rows) >= 2, f"行 {len(audit.rows)}")
     browser.select_action("找文档")
     test("界面：空输入先拦住", not browser.run_current().ok)
     groups = [spec.group for spec in gui.SPECS]
-    test("界面：浏览页分四组", groups == ["工作区", "工作区", "查看", "查看", "指令", "指令", "报告", "报告"], str(groups))
+    test("界面：浏览页分两组", groups == ["工作区", "工作区", "查看", "查看"], str(groups))
 
     with tempfile.TemporaryDirectory() as tmp:
         fake = fake_repo(Path(tmp) / "desk")
@@ -214,11 +210,12 @@ def gui_smoke(real: Path) -> None:
         data = Path(tmp) / "data"
         desk = gui.Desk(fake, data)
         test("台面：没有运行时提示新建", "新建" in desk.next_label.text())
-        flow_layer.create(fake, "试一次", data, ["材料", "核对"], "把纪律落下来")
+        flow_layer.create(data, "试一条", ["材料", "核对"], "把纪律落下来")
+        task_layer.create(fake, data, "试一次", "试一条", "把纪律落下来")
         desk.reload()
         test("台面：步骤表按工作流列出", desk.steps_table.rowCount() == 2 and desk.steps_table.item(0, 2).text() == "—")
         desk.selected_step()
-        report.run_step(fake, "试一次", "材料", "记了一条", data)
+        report.task_step(fake, data, "试一次", "材料", "记了一条")
         desk.reload()
         test("台面：状态跟着走", desk.steps_table.item(0, 2).text() == "✓" and desk.log_table.rowCount() >= 2)
     window.close()
@@ -228,8 +225,8 @@ def gui_smoke(real: Path) -> None:
 def main() -> int:
     real = assets_layer.repo_root()
     workspace(real)
-    instruction(real)
-    runs(real)
+    judges(real)
+    flow_and_task(real)
     links(real)
     gui_smoke(real)
 

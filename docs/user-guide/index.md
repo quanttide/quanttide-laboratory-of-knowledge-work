@@ -11,50 +11,53 @@ uv pip install -e .       # 或装成命令：kg / kg-gui
 
 界面要 PySide6 的窗口模块；缺了就在实验室内建个虚拟环境：`uv venv .venv && uv pip install -e '.[gui]'`，然后 `.venv/bin/kg-gui`。
 
-## 工作流：一串步骤，每步关联一个任务
-
-程序**不预置编排**。一次运行的工作流写在自己的现场里：
-
-```text
-data/
-├── workflows/<运行>.md          工作流：步骤清单（- 步骤 → tasks/<运行>/步骤.md）
-├── tasks/<运行>/<步骤>.md        任务：目标 / 步骤 / 验收
-└── artifacts/<运行>/
-    ├── log.jsonl              执行记录
-    ├── report.md              报告（事件）：执行记录 + 闸门项
-    └── history.md             历史（叙事）
-```
-
-任务的三段是手册的写法：**目标 / 步骤 / 验收**；判据（机械的、闸门的）写在验收里。
-
-## 执行一次
+## 工作流：串联的步骤（定义）
 
 ```bash
-$ kg run --new 数据归仓 --about "所有数据放实验室 data/" --steps 材料,指令,核对,产出,裁决,成果,历史
-起了：…/examples/default/data/workflows/数据归仓.md
-  — 材料 → tasks/数据归仓/材料.md
-  — 指令 → tasks/数据归仓/指令.md
-  …
-
-$ kg run 数据归仓 --done 材料 --note "AGENTS.md、日志"
-✓ 材料：AGENTS.md、日志
-下一步：指令（这一步关联的任务：tasks/数据归仓/指令.md）
-
-$ kg run 数据归仓 --done 核对
-✓ 核对：机械：日志在（path:data/journal/README.md）
-  ⧗ 闸门：创始人过目（留给闸门）
-
-$ kg run 数据归仓 --history "先有报告/历史的归位，再有数据只在本仓的纪律。"
-
-$ kg run 数据归仓                       # 看步骤、关联的任务、下一步与流水
-$ kg run --list                        # 有哪些运行
+$ kg workflow --new 课程档案比对 --steps 定位,比对,结论 --note "比对两边的档案"
+写下工作流：…/data/workflows/课程档案比对.md
+$ kg workflow 课程档案比对
+  定位：1 条判据  比对：3 条判据  结论：1 条判据
 ```
 
-**执行的是任务**：`--done <步骤>` 跑那一步关联任务的验收判据（机械的当场给结论，闸门的列出来），记一笔流水，刷新报告。没有判据的步骤也能记一笔（`--note` 一句话）。任务文件是给你写的——点窗口里那一行（或直接开 `tasks/<步骤>.md`）就能改。
+工作流是数据不是代码，写在 `data/workflows/<名字>.md` —— 步骤用 `### 步骤名` 串起来，每步自带验收（机械的当场判，闸门的留给人）：
 
-## 工作步骤
+```markdown
+### 比对
 
-[工作步骤](work-steps.md)：拿一次真事（课程档案比对）走完七步——找源、立流程、写任务、干活、一步一记、看、收尾。
+- 做什么：把两边逐项比一遍
+- [ ] 机械：产物落成 `path:examples/default/data/artifacts/课程档案比对/比对.md`
+- [ ] 闸门：创始人点头
+```
+
+## 任务：工作流的一次执行（实例）
+
+```bash
+$ kg task --new 课程档案比对 --workflow 课程档案比对 --about "比对 work 侧与课程研发档案"
+起了：…/data/tasks/课程档案比对.md
+
+$ kg task 课程档案比对 --done 比对 --note "口径 / 重叠 / 缺口 / 格式差"
+✓ 比对：口径 / 重叠 / 缺口 / 格式差
+  ✓ 机械：产物落成（path:…/比对.md）
+  ⧗ 闸门：创始人点头（留给闸门）
+下一步：结论
+
+$ kg task 课程档案比对                     # 步骤状态与流水
+$ kg task --list                          # 有哪些任务
+$ kg task 课程档案比对 --history "先找齐两边，再按四条比……"
+```
+
+**同一件任务 = 同一个工作流的一次执行**；跑第二遍就是另一件任务。走一步记一笔，报告机器写，历史人写。
+
+## 数据：三家分放
+
+**所有数据放本仓 `data/`**（工作纪律，见 `AGENTS.md`），`--data` 可换：
+
+```text
+data/workflows/<工作流>.md     定义：串联的步骤与判据
+data/tasks/<任务>.md           实例：跑哪条工作流、要什么
+data/artifacts/<任务>/         产物：log.jsonl、report.md、history.md
+```
 
 ## 窗口
 
@@ -65,7 +68,7 @@ $ kg run --list                        # 有哪些运行
 
 顶栏可改工作区（默认从当前目录往上找），也显示数据落点。
 
-## 浏览页的几个动作
+## 浏览页：工作区层面的动作
 
 ```bash
 $ kg catalog                    # 目录：按资产种类列出全部条目
