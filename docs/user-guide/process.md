@@ -135,9 +135,18 @@ $ kg task 课程档案比对 --history "先找齐两边，再按口径 / 重叠 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
 data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流、要什么
-data/artifacts/report/<任务>.md   报告（事件）：执行记录 + 闸门项，机器写
-data/artifacts/history/<任务>.md  历史（叙事）：人写
-data/artifacts/log/<任务>.jsonl   流水：哪一步、什么时候、结果如何
+data/artifacts/report/<任务>.md   报告：程序维护「执行记录」「闸门项」两节，其余节是人 / AI 写的产物
+data/artifacts/history/<任务>.md  历史（叙事）
+data/artifacts/log/<任务>.jsonl   流水（只增不改）
+
+**程序出的结果就是产物**：落在 `artifacts/` 里按类型分家，可读可改可版控；程序写报告时只动它自己那两节。工作流要引用它们，用占位——不写死任务名：
+
+```yaml
+  - executor: rule
+    description: 报告里点到两边的课
+    file: "{{report}}"            # 本任务的报告；还有 {{history}} / {{log}} / {{artifacts}}
+    contains: production-internship
+```
 ```
 
 ## 窗口里也一样

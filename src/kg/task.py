@@ -15,6 +15,7 @@
 """
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime
@@ -146,7 +147,11 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
 {criteria_text(step)}
 
-程序自己的记账落在：{task.artifacts_dir}（report / history / log，按下任务名）——这一步的产物按上面「做什么」里写明的地方落
+本任务的三样产物（报告 / 历史 / 流水，都是可维护的产物，不是程序的临时文件）：
+  报告：{task.relative(task.artifact(REPORT))}（程序只维护「执行记录」与「闸门项」两节，其余节归你写）
+  历史：{task.relative(task.artifact(HISTORY))}
+  流水：{task.relative(task.artifact(LOG))}
+工作流里用 {{{{report}}}} / {{{{history}}}} / {{{{log}}}} 指这三样；产物内容写进报告，别动程序那两节。
 规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """
 
@@ -211,6 +216,25 @@ def one_line(text: str, limit: int = 80) -> str:
     return line[:limit]
 
 
+PLACEHOLDER = re.compile(r"\{\{(?P<kind>report|history|log|artifacts)\}\}")
+
+
+def expand(task: Task, value: str) -> str:
+    """把 {{report}} / {{history}} / {{log}} / {{artifacts}} 换成这个任务的产物路径（相对工作区根，跨仓则绝对）。"""
+    def one(match: re.Match) -> str:
+        kind = match.group("kind")
+        path = task.artifacts_dir if kind == "artifacts" else task.artifact(kind)
+        # 判据按工作区根解析，占位也给工作区根视角的路径
+        return str(path.relative_to(task.root)) if path.is_relative_to(task.root) else str(path)
+
+    return PLACEHOLDER.sub(one, value)
+
+
+def expanded_criteria(task: Task, criteria: list[dict]) -> list[dict]:
+    """判据里的占位先换成本次任务的真实路径，再去跑。"""
+    return [{key: expand(task, value) if isinstance(value, str) else value for key, value in criterion.items()} for criterion in criteria]
+
+
 def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = False) -> tuple[bool, list[str], list[tuple[str, str, str]]]:
     """走一步：能让 AI 跑的交给 AI，然后跑判据、记账、写报告。"""
     found = task.workflow().step(step)
@@ -229,7 +253,7 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     elif found.human and auto:
         lines.append(f"{found.name}：这一步的执行者是人（{found.executor}）——轮到你，做完用 kg task <名字> --done {found.name}")
         return True, lines, []
-    results, _ = checks_layer.run(root, checks_layer.items_of(found.rules))
+    results, _ = checks_layer.run(root, checks_layer.items_of(expanded_criteria(task, found.rules)))
     judged = judge_by_ai(task, found, found.agents, root) if (auto and found.agents) else [
         (str(criterion.get("description", "")).strip(), "待判", "没跑智能体（人为地记一步）") for criterion in found.agents
     ]
@@ -248,17 +272,32 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     return ok, lines, rows + [(note, "闸门", "留给人拍板") for note in gates]
 
 
+SECTIONS = ("执行记录", "闸门项")   # 报告里归程序管的两节；别的节（人 / AI 写的产物）原样留着
+
+
 def write_report(task: Task, gates: list[str]) -> Path:
-    """报告：执行记录（每步一行）+ 闸门项（留给人）。"""
-    lines = [f"# 报告：{task.name}", "", "## 执行记录", ""]
-    for event in task.events():
-        lines.append(f"- {'✓' if event.get('ok') else '✗'} {event['at']}　{event['step']}　{event['detail']}")
-    lines += ["", "## 闸门项", ""]
-    lines += [f"- ⧗ {note}（留给人 / 待判）" for note in gates] or ["- （暂无）"]
+    """报告：程序只动「执行记录」与「闸门项」两节，其余节（产物内容）保留。"""
     path = task.artifact(REPORT)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    if not text.strip():
+        text = f"# 报告：{task.name}\n"
+    records = [f"- {'✓' if event.get('ok') else '✗'} {event['at']}　{event['step']}　{event['detail']}" for event in task.events()]
+    gates_lines = [f"- ⧗ {note}（留给人 / 待判）" for note in gates] or ["- （暂无）"]
+    text = replace_section(text, "执行记录", records)
+    text = replace_section(text, "闸门项", gates_lines)
+    path.write_text(text, encoding="utf-8")
     return path
+
+
+def replace_section(text: str, title: str, body: list[str]) -> str:
+    """把某一节的正文换掉，其它节原样保留；没有这一节就补在后面。"""
+    head, marker, tail = text.partition(f"## {title}")
+    block = f"## {title}\n\n" + "\n".join(body) + "\n"
+    if not marker:
+        return text.rstrip() + "\n\n" + block
+    _, _, rest = tail.partition("## ")
+    return head + block + ("\n## " + rest if rest else "")
 
 
 def narrate(task: Task, words: str) -> None:

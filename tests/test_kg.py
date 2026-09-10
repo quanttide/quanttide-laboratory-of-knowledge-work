@@ -185,6 +185,16 @@ def flow_and_task(real: Path) -> None:
         test("报告：执行记录写下来了", "## 执行记录" in written and "比对" in written)
         test("报告：闸门项留给人", "## 闸门项" in written and "⧗" in written)
 
+        # 产物可维护：程序只动自己两节，别的节留着；占位能指到本任务的产物
+        report_file = task.artifact("report")
+        report_file.write_text(report_file.read_text(encoding="utf-8") + "\n## 产物：对照\n\n人写的内容\n", encoding="utf-8")
+        payload = flow_layer.load(flow.file)
+        payload["steps"][2]["criteria"] = [{"executor": "rule", "description": "本任务报告里有结论", "file": "{{report}}", "contains": "## 结论"}]
+        flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
+        kept = report.task_step(root, data, "试一次", "结论", "写了结论")
+        test("产物可维护：程序只动自己两节，别的节留着", "人写的内容" in report_file.read_text(encoding="utf-8"), "人写的节被覆盖")
+        test("占位：{{report}} 指到本任务的报告", all("{{" not in str(row) for row in kept.rows) and any("artifacts/report/试一次.md" in str(row) for row in kept.rows), str(kept.rows))
+
         report.task_history(root, data, "试一次", "先串步骤，再执行。")
         test("历史：叙事进 artifacts", records.prose(task.artifact("history")) != "")
         test("列任务：报工作流与下一步", report.task_list(root, data).rows[0][1] == "试一条")

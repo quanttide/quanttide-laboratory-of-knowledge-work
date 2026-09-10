@@ -10,13 +10,15 @@
 data/
 ├── workflows/<工作流>.yaml      工作流：串联的步骤（name / what / executor / judges）
 ├── tasks/<任务>.yaml            任务：工作流的一次执行（workflow、goal）
-└── artifacts/                 产物按类型分家，按任务名命名
-    ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项
+└── artifacts/                 产物按类型分家，按任务名命名（都是可维护的产物）
+    ├── report/<任务>.md        报告：程序只维护「执行记录」「闸门项」两节，别的节归人 / AI
     ├── history/<任务>.md       历史（叙事）
-    └── log/<任务>.jsonl        流水
+    └── log/<任务>.jsonl        流水（只增不改）
 ```
 
 目录按领域模型分三家：workflows（过程的编排定义）、tasks（工作流的一次执行实例）、artifacts（产物）。
+
+**程序出的结果也是产物**：报告 / 历史 / 流水就落在 `artifacts/` 里按类型分家，人可续写、可改、可版控；程序写报告时只动自己那两节，别人的节不许覆盖。工作流用 `{{report}}` / `{{history}}` / `{{log}}` 引用本任务的产物，不写死任务名。
 
 **定义用 YAML，记录用 Markdown**：工作流与任务要「意义固定」（字段、取值由 schema 定死），所以是 YAML；报告与历史是读物与叙事，仍是 Markdown；流水是 JSONL。
 
