@@ -1,0 +1,35 @@
+name: 课程档案比对
+note: 步骤串联：写清每步做什么、怎么算完。
+steps:
+- name: 定位
+  what: 定位
+  executor: AI
+  judges:
+  - kind: 机械
+    note: 个人课程档案在
+    spec: path:data/profile/iGuo/course/index.md
+  - kind: 机械
+    note: 课程研发档案在
+    spec: path:/home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
+- name: 比对
+  what: 比对
+  executor: AI
+  judges:
+  - kind: 机械
+    note: 产物落成
+    spec: path:examples/default/data/artifacts/课程档案比对/比对.md
+  - kind: 机械
+    note: 产物点到两边的课
+    spec: contains:examples/default/data/artifacts/课程档案比对/比对.md=production-internship
+  - kind: 机械
+    note: 产物给了两侧缺口
+    spec: contains:examples/default/data/artifacts/课程档案比对/比对.md=缺口
+- name: 结论
+  what: 结论
+  executor: AI
+  judges:
+  - kind: 机械
+    note: 结论写进产物
+    spec: contains:examples/default/data/artifacts/课程档案比对/比对.md=## 结论
+  - kind: 闸门
+    note: 创始人点头（回流与并法怎么定）

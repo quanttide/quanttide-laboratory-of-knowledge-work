@@ -1,10 +1,7 @@
-"""判据：从指令的「验收」段里读机械核对，然后执行。
+"""判据：跑定义里写下的机械核对。
 
-写法是一句说明加一个反引号给出的判据：
-
-  机械：目标侧文件已就位 `path:docs/index.md`
-
-判据四种——路径相对仓库根，写绝对路径则按绝对路径（跨仓库核对用）：
+判据是结构化字段（`kind: 机械` + `spec`），不是从散文里猜出来的。
+spec 四种——路径相对工作区根，写绝对路径则按绝对路径（跨仓库核对用）：
 
   path:<路径>          路径存在
   absent:<路径>        路径不存在
@@ -19,13 +16,9 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-ITEM = re.compile(r"^\s*-\s*\[[ xX]\]\s*(.+)$")
-SPEC = re.compile(r"`([^`]+)`")
-
-
 @dataclass
 class Item:
-    """一条检查项：说明 + 判据（判据为空即闸门项）。"""
+    """一条要跑的判据：说明 + spec（spec 为空即闸门项，不跑）。"""
 
     note: str
     spec: str | None = None
@@ -35,25 +28,9 @@ class Item:
         return self.spec is not None
 
 
-def parse(text: str, section: str | None = "验收") -> list[Item]:
-    """抽出某一节里的判据条目；section=None 表示整段都是判据（步骤的验收）。"""
-    items: list[Item] = []
-    inside = section is None
-    for line in text.splitlines():
-        if line.startswith("## ") and section is not None:
-            inside = line[3:].strip() == section
-            continue
-        if not inside:
-            continue
-        match = ITEM.match(line)
-        if not match:
-            continue
-        body = match.group(1).strip()
-        if "<" in body:  # 模板占位不算判据
-            continue
-        found = SPEC.search(body)
-        items.append(Item(SPEC.sub("", body).strip(" ——：、"), found.group(1).strip() if found else None))
-    return items
+def items_of(judges: list[dict]) -> list[Item]:
+    """把定义里的判据（机械 / 闸门）翻成要跑的东西。"""
+    return [Item(str(judge.get("note", "")).strip(), str(judge["spec"]).strip() if judge.get("kind") == "机械" else None) for judge in judges]
 
 
 def check(root: Path, spec: str) -> tuple[bool, str]:

@@ -100,21 +100,22 @@ def workspace(real: Path) -> None:
 
 
 def judges(real: Path) -> None:
-    """判据：机械的当场判，闸门的列出来，模板占位不算。"""
-    text = """## 验收
-
-- [ ] 机械：目标侧文件已就位 `path:data/journal/README.md`
-- [ ] 机械：旧文件已删除 `absent:gone.md`
-- [ ] 闸门：落点与源位置同构
-- [ ] 机械：<占位不算判据> `path:不存在`
-"""
+    """判据：结构化字段（机械带 spec、闸门只有说明），四种 spec 都能跑。"""
+    defined = [
+        {"kind": "机械", "note": "目标侧文件已就位", "spec": "path:data/journal/README.md"},
+        {"kind": "机械", "note": "旧文件已删除", "spec": "absent:gone.md"},
+        {"kind": "机械", "note": "含某段文字", "spec": "contains:data/journal/README.md=日志"},
+        {"kind": "机械", "note": "命令跑得通", "spec": "run:test -f data/journal/README.md"},
+        {"kind": "闸门", "note": "落点与源位置同构"},
+    ]
     with tempfile.TemporaryDirectory() as inner:
         root = Path(inner) / "repo"
         (root / "data" / "journal").mkdir(parents=True)
         (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
-        items = checks_layer.parse(text)
+        items = checks_layer.items_of(defined)
         results, gates = checks_layer.run(root, items)
-        test("判据：机械与闸门分得开，占位不算", len(results) == 2 and len(gates) == 1, f"机械 {len(results)}，闸门 {len(gates)}")
+        test("判据：机械与闸门分得开", len(results) == 4 and len(gates) == 1, f"机械 {len(results)}，闸门 {len(gates)}")
+        test("判据：四种 spec 都跑得通", all(ok for _, ok, _ in results), str(results))
         (root / "gone.md").write_text("还在\n", encoding="utf-8")
         failed = [ok for _, ok, _ in checks_layer.run(root, items)[0]]
         test("判据：该报红时报红", failed.count(False) == 1, f"实得 {failed}")
@@ -131,22 +132,18 @@ def flow_and_task(real: Path) -> None:
         report.workflow_new(data, "试一条", ["定位", "比对", "结论"], "看看能不能串起来")
         flow = flow_layer.open_workflow(data, "试一条")
         test("工作流：步骤按写的顺序串起来", [s.name for s in flow.steps()] == ["定位", "比对", "结论"])
-        test("工作流：每步自带验收骨架", all("机械：" in s.judges for s in flow.steps()))
+        test("工作流：每步自带验收骨架（默认 AI）", all(s.machine and s.executor == "AI" for s in flow.steps()))
 
-        # 把「比对」这一步的判据换成真的
-        text = flow.file.read_text(encoding="utf-8")
-        text = text.replace("""### 比对
-
-- 做什么：<比对这一步做什么>
-- 执行者：AI
-- [ ] 机械：<能写成断言的> `path:data/journal/README.md`
-- [ ] 闸门：<只能人拍板的>""", """### 比对
-
-- 做什么：把两边比一遍
-- 执行者：AI
-- [ ] 机械：日志在 `path:data/journal/README.md`
-- [ ] 闸门：创始人过目""")
-        flow.file.write_text(text, encoding="utf-8")
+        # 把「比对」这一步写成真的
+        payload = flow_layer.load(flow.file)
+        step = payload["steps"][1]
+        step["what"] = "把两边比一遍"
+        step["judges"] = [
+            {"kind": "机械", "note": "日志在", "spec": "path:data/journal/README.md"},
+            {"kind": "闸门", "note": "创始人过目"},
+        ]
+        flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
+        flow.reload()
 
         # 把「写给 AI 跑」的那一环换掉：测试里不真调 pi
         real_ai = task_layer.run_ai
@@ -168,8 +165,9 @@ def flow_and_task(real: Path) -> None:
         test("走一步：AI 干活也记一笔", any("AI 执行" in e["detail"] for e in task.events()), str(task.events()[-1:]))
 
         # 标了「执行者：人」的步骤，程序不抢着做
-        text = flow.file.read_text(encoding="utf-8")
-        flow.file.write_text(text.replace("### 比对\n\n- 做什么：把两边比一遍", "### 比对\n\n- 做什么：把两边比一遍\n- 执行者：人"), encoding="utf-8")
+        payload = flow_layer.load(flow.file)
+        payload["steps"][1]["executor"] = "人"
+        flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
         calls.clear()
         human = report.task_step(root, data, "试一次", "", auto=True)
         test("走一步：人做的步骤等人", human.ok and not calls and "轮到你" in "".join(human.lines), str(human.lines))
@@ -198,17 +196,17 @@ def carry(real: Path) -> None:
         home = Path(tmp) / "data-a"
         away = Path(tmp) / "data-b"
         report.workflow_new(home, "带走的流程", ["步", "做"], "试一份可带走的工作流")
-        source = report.workflow_export(home, "带走的流程", Path(tmp) / "带走的流程.md")
-        test("导出：文件落地", source.ok and (Path(tmp) / "带走的流程.md").is_file())
+        source = report.workflow_export(home, "带走的流程", Path(tmp) / "带走的流程.yaml")
+        test("导出：文件落地（YAML，原样）", source.ok and (Path(tmp) / "带走的流程.yaml").is_file())
 
         here = flow_layer.open_workflow(home, "带走的流程")
         before = [(s.name, s.executor, s.judges) for s in here.steps()]
-        imported = report.workflow_import(away, Path(tmp) / "带走的流程.md")
+        imported = report.workflow_import(away, Path(tmp) / "带走的流程.yaml")
         there = flow_layer.open_workflow(away, "带走的流程")
         test("导入：落进另一个数据仓", imported.ok and there.file.is_file() and there.file.is_relative_to(away))
         test("导入：步骤、执行者、判据一字不差", before == [(s.name, s.executor, s.judges) for s in there.steps()], str(before))
-        test("导入：重名挡住", not report.workflow_import(away, Path(tmp) / "带走的流程.md").ok)
-        test("导入：换名字放行", report.workflow_import(away, Path(tmp) / "带走的流程.md", "带走的流程·二").ok)
+        test("导入：重名挡住", not report.workflow_import(away, Path(tmp) / "带走的流程.yaml").ok)
+        test("导入：换名字放行", report.workflow_import(away, Path(tmp) / "带走的流程.yaml", "带走的流程·二").ok)
         test("导入：不是工作流的文件挡住", not report.workflow_import(away, LAB / "README.md").ok)
 
 
@@ -249,6 +247,7 @@ def gui_smoke(real: Path) -> None:
     with tempfile.TemporaryDirectory() as tmp:
         fake = fake_repo(Path(tmp) / "desk")
         (fake / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n", encoding="utf-8")
+        (fake / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
         data = Path(tmp) / "data"
         desk = gui.Desk(fake, data)
         test("台面：没有运行时提示新建", "新建" in desk.next_label.text())

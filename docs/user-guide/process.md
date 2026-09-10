@@ -9,53 +9,61 @@ $ kg workflow --new 课程档案比对 --steps 定位,比对,结论 --note "比�
 写下工作流：…/data/workflows/课程档案比对.md
 ```
 
-落在 `data/workflows/<名字>.md`，步骤用 `### 步骤名` 串，**每步自带验收**：
+落在 `data/workflows/<名字>.yaml`——**定义用 YAML，因为定义要「意义固定」**（字段、取值、判据种类都由 schema 定死，谁读都是同一件事）：
 
-```markdown
-# 工作流：课程档案比对
-
-## 步骤
-
-### 定位
-
-- 做什么：把两边的源找齐
-- 执行者：AI
-- [ ] 机械：个人课程档案在 `path:data/profile/iGuo/course/index.md`
-- [ ] 机械：课程研发档案在 `path:/home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md`
-
-### 比对
-
-- 做什么：逐项对照，落成一件产物
-- 执行者：人
-- [ ] 机械：产物落成 `path:examples/default/data/artifacts/课程档案比对/比对.md`
-- [ ] 机械：产物点到两边的课 `contains:…比对.md=production-internship`
-- [ ] 闸门：创始人点头（回流与并法怎么定）
+```yaml
+name: 课程档案比对
+note: 比对两边的档案
+steps:
+  - name: 定位
+    what: 把两边的源找齐
+    executor: AI                # AI | 人；默认 AI
+    judges:
+      - kind: 机械              # 机械：程序当场判
+        note: 个人课程档案在
+        spec: path:data/profile/iGuo/course/index.md
+      - kind: 机械
+        note: 课程研发档案在
+        spec: path:/home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
+  - name: 核对
+    what: 逐项对照，落成一件产物
+    executor: 人                 # 要人做必须显式写
+    judges:
+      - kind: 机械
+        note: 产物落成
+        spec: path:examples/default/data/artifacts/课程档案比对/比对.md
+      - kind: 闸门               # 闸门：只有说明，留给人拍板
+        note: 创始人点头（回流与并法怎么定）
 ```
 
-**执行者**：默认 AI——`- 执行者：AI`（或干脆不写）；要人做的步骤必须显式写 `- 执行者：人`（闸门那类）。判据四种、路径相对工作区根（写绝对路径则按绝对路径，跨仓库核对用）：`` `path:` `` 存在、`` `absent:` `` 不存在、`` `contains:文件=文字` `` 含某段文字、`` `run:命令` `` 退出码为零。没有判据的条目是**闸门项**，列给人拍板。
+判据两种：**机械**（带 `spec`，程序当场判）与**闸门**（只有说明，留给人）。`spec` 四样：`` `path:` `` 存在、`` `absent:` `` 不存在、`` `contains:文件=文字` `` 含某段文字、`` `run:命令` `` 退出码为零；路径相对工作区根（写绝对路径则按绝对路径，跨仓库核对用）。
 
-**可改**就在这儿：加一步、去一步、换顺序、改判据——动这份 Markdown 就行，程序一行不用改；进 git 能 diff、能回退。
+不合格的 YAML 会被挡回来（少了 `name`、`steps`、步骤少了 `name`、`executor` 不是 `AI|人`、判据 `kind` 不是 `机械|闸门`、机械判据少了 `spec`）——不是「像不像」，是**合不合 schema**。
+
+**可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 
 ```bash
-$ kg workflow 课程档案比对      # 看步骤与各步几条判据
+$ kg workflow 课程档案比对      # 看步骤、谁执行、几条机械几条闸门
 $ kg workflow --list           # 有哪些工作流
 ```
 
+（报告与历史仍是 Markdown，流水是 JSONL：**定义要固定意义，记录要读得顺**——两回事。）
+
 ## 一之二、存下来，下次导入用
 
-工作流本来就是一份 Markdown，导出/导入只是搬文件加一道校验：
+工作流本来就是一份 YAML，导出/导入只是搬文件加一道 schema 校验：
 
 ```bash
-$ kg workflow 课程档案比对 --export ~/流程/课程档案比对.md
-已导出：/home/iguo/流程/课程档案比对.md（步骤 3 个，原样带走）
+$ kg workflow 课程档案比对 --export ~/流程/课程档案比对.yaml
+已导出：/home/iguo/流程/课程档案比对.yaml（步骤 3 个，原样带走）
 
-$ kg workflow --import ~/流程/课程档案比对.md
-已导入：workflows/课程档案比对.md（步骤 3 个）
+$ kg workflow --import ~/流程/课程档案比对.yaml
+已导入：workflows/课程档案比对.yaml（步骤 3 个）
 
-$ kg workflow --import ~/流程/课程档案比对.md --as 课程档案比对·二   # 重名时换名字
+$ kg workflow --import ~/流程/课程档案比对.yaml --as 课程档案比对·二   # 重名时换名字
 ```
 
-导入时会验一下「有没有步骤」——不是工作流的文件挡回来；重名挡回来（用 `--as` 换名）。导出的是**原样**：步骤、执行者、判据一字不差，所以换一台机器、换一个 `--data`、换一个仓库，导进去就能跑。
+导入时先按 schema 验一遍——不是工作流的文件挡回来；重名挡回来（用 `--as` 换名）。导出的是**原样**：步骤、执行者、判据一字不差，所以换一台机器、换一个 `--data`、换一个仓库，导进去就能跑。
 
 带走的判据里若写着相对路径或绝对路径，导进别的项目要自己核对一遍——判据跟着工作流走，但它认的是**那边的**工作区。
 
@@ -110,9 +118,9 @@ $ kg task 课程档案比对 --history "先找齐两边，再按口径 / 重叠 
 ## 数据：三家分放
 
 ```text
-data/workflows/<工作流>.md     定义：串联的步骤与判据
-data/tasks/<任务>.md           实例：跑哪条工作流、要什么
-data/artifacts/<任务>/         产物：log.jsonl、report.md、history.md
+data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
+data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流、要什么
+data/artifacts/<任务>/         产物：log.jsonl（流水）、report.md（事件）、history.md（叙事）
 ```
 
 ## 窗口里也一样
@@ -124,7 +132,7 @@ data/artifacts/<任务>/         产物：log.jsonl、report.md、history.md
 - **能用 AI 跑的都用 AI**：步骤默认 `执行者：AI`；人只留在闸门（拍板、判断型验收）；
 
 - **数据全落 `data/`**（workflows / tasks / artifacts 三家），不写实验室外面；
-- **判据写进步骤的验收**，模板里的占位（`<…>`）不算判据；
+- **定义用 YAML、记录用 Markdown**：编排与判据是定义（schema 定死），报告与历史是记录（读得顺）；
 - **工作流是数据不是代码**：改流程不改程序；程序不预置编排，也不替你攒模板——想留，自己把文件放过去；
 - **别人的仓库不擅动**：跨仓库的动作（如 course 侧）要授权。
 

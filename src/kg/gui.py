@@ -349,7 +349,7 @@ class Desk(QWidget):
         outer.addLayout(top)
 
         self.steps_table = QTableWidget(0, 3)
-        self.steps_table.setHorizontalHeaderLabels(["步骤", "怎么算完", "状态"])
+        self.steps_table.setHorizontalHeaderLabels(["步骤", "谁执行 / 判据", "状态"])
         self.steps_table.verticalHeader().setVisible(False)
         self.steps_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.steps_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -433,10 +433,9 @@ class Desk(QWidget):
         steps = self.task.steps()
         self.steps_table.setRowCount(len(steps))
         for row, step in enumerate(steps):
-            judges = len([line for line in step.judges.splitlines() if line.strip()])
+            counts = f"{len(step.machine)} 机械" + (f" / {len(step.gates)} 闸门" if step.gates else "")
             self.steps_table.setItem(row, 0, QTableWidgetItem(step.name))
-            who = step.executor if not step.human else "人"
-            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{who}　{'%d 条判据' % judges if judges else '无判据'}"))
+            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{step.executor}　{counts}" if step.judges else step.executor))
             self.steps_table.setItem(row, 2, QTableWidgetItem("✓" if step.name in done else "—"))
         if steps and self.steps_table.currentRow() < 0:
             nxt = self.task.next_step()

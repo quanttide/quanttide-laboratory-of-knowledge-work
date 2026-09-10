@@ -3,14 +3,15 @@
 规格：任务（Task）＝过程的一次执行实例；它跑的是某条工作流（workflow.py）。
 
 <数据仓>/
-├── tasks/<任务>.md           这一次的指令：跑哪条工作流、要什么
+├── tasks/<任务>.yaml         这一次的指令：跑哪条工作流、要什么
 └── artifacts/<任务>/
     ├── log.jsonl             执行记录：哪一步、什么时候、结果如何、一句话
     ├── report.md             报告（事件）：执行记录 + 闸门项，机器写
     └── history.md            历史（叙事）：人写
 
-人执行的是步骤：走工作流上的某一步，这一步的验收判据当场判（机械）、列给人（闸门），
-事实记进流水与报告。同一个工作流可以被执行很多次，每次都是一件新任务。
+任务是 YAML（跑哪条工作流、要什么），定义是 YAML（步骤、执行者、判据——见 workflow.py）；
+流水是 JSONL、报告与历史是 Markdown——那是记录与叙事，读物。
+走一步：执行者是 AI 的交给 pi 跑，然后程序自己判机械判据、把闸门项列给人，事实记进流水与报告。
 """
 
 import json
@@ -19,6 +20,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from . import checks as checks_layer
 from . import records
 from . import workflow as workflow_layer
@@ -26,15 +29,8 @@ from . import workflow as workflow_layer
 LOG = "log.jsonl"
 REPORT = "report.md"
 HISTORY = "history.md"
-WORKFLOW_LINE = "跑工作流"
-TASK_TEMPLATE = """# 任务：{title}
-
-{line}：{flow}
-
-## 目标
-
-{goal}
-"""
+def dump(data: dict) -> str:
+    return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=200)
 
 
 def now() -> str:
@@ -51,7 +47,7 @@ class Task:
 
     @property
     def file(self) -> Path:
-        return self.data / "tasks" / f"{self.name}.md"
+        return self.data / "tasks" / f"{self.name}.yaml"
 
     @property
     def artifacts_dir(self) -> Path:
@@ -63,21 +59,20 @@ class Task:
     def exists(self) -> bool:
         return self.file.is_file()
 
-    def text(self) -> str:
-        return self.file.read_text(encoding="utf-8") if self.file.is_file() else ""
+    def payload(self) -> dict:
+        if not self.file.is_file():
+            return {}
+        try:
+            loaded = yaml.safe_load(self.file.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            return {}
+        return loaded if isinstance(loaded, dict) else {}
 
     def goal(self) -> str:
-        """指令里的目标：## 目标 那一段的正文。"""
-        _, marker, tail = self.text().partition("## 目标")
-        if not marker:
-            return ""
-        return tail.split("## ")[0].strip()
+        return str(self.payload().get("goal", "")).strip()
 
     def workflow_name(self) -> str:
-        for line in self.text().splitlines():
-            if line.startswith(WORKFLOW_LINE):
-                return line.split("：", 1)[-1].split(":", 1)[-1].strip()
-        return ""
+        return str(self.payload().get("workflow", "")).strip()
 
     def workflow(self) -> workflow_layer.Workflow:
         return workflow_layer.open_workflow(self.data, self.workflow_name())
@@ -113,7 +108,7 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     task.file.parent.mkdir(parents=True, exist_ok=True)
     task.artifacts_dir.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(TASK_TEMPLATE.format(title=name, line=WORKFLOW_LINE, flow=workflow_name, goal=about or "<这一次要什么，一句话>"), encoding="utf-8")
+        task.file.write_text(dump({"name": name, "workflow": workflow_name, "goal": about or "<这一次要什么，一句话>"}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(HISTORY).is_file():
@@ -128,7 +123,7 @@ def open_task(root: Path, data: Path, name: str) -> Task:
 
 def listing(root: Path, data: Path) -> list[Task]:
     base = Path(data) / "tasks"
-    return [Task(root, Path(data), path.stem) for path in sorted(base.glob("*.md"))] if base.is_dir() else []
+    return [Task(root, Path(data), path.stem) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
 
 
 def prompt_for(task: Task, step: workflow_layer.Step) -> str:
@@ -187,7 +182,7 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     elif found.human and auto:
         lines.append(f"{found.name}：这一步的执行者是人（{found.executor}）——轮到你，做完用 kg task <名字> --done {found.name}")
         return True, lines, []
-    results, gates = checks_layer.run(root, checks_layer.parse(found.judges, section=None))
+    results, gates = checks_layer.run(root, checks_layer.items_of(found.judges))
     ok = all(passed for _, passed, _ in results)
     detail = note.strip() or ("；".join(item.note for item, _, _ in results) if results else "做完")
     if not (auto and not found.human):

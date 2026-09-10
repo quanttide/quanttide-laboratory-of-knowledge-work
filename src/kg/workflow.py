@@ -1,25 +1,36 @@
-"""工作流：串联的工作步骤——过程的编排定义。
+"""工作流：串联的工作步骤——过程的编排定义，用 YAML 存。
 
 规格：工作流（Workflow）＝过程的编排定义；任务（Task）＝过程的一次执行实例（见 task.py）。
 
-工作流落在 <数据仓>/workflows/<名字>.md：
+定义要有**固定的意义**，所以是 YAML 而不是散文：字段名、取值、判据种类都由 schema 定死。
 
-  # 工作流：<名字>
-  ## 步骤
-  ### 定位
-  - 做什么：把两边的源找齐
-  - [ ] 机械：…在 `path:…`
-  - [ ] 闸门：…
+<数据仓>/workflows/<名字>.yaml
 
-每个步骤自带执行者与验收判据：**默认交给 AI 跑**（`pi -p`），要人做的步骤显式写 `- 执行者：人`；
-判据里机械的当场判、闸门的留给人。工作流只管编排与判据，执行是任务的事——同一个工作流可被多次执行。
+  name: 课程档案比对
+  note: 比对两边的档案
+  steps:
+    - name: 定位
+      what: 把两边的源找齐
+      executor: AI          # AI | 人
+      judges:
+        - kind: 机械
+          note: 个人课程档案在
+          spec: path:data/profile/iGuo/course/index.md
+        - kind: 闸门
+          note: 创始人点头（回流与并法怎么定）
+
+判据两种（kind）：机械（带 spec，程序当场判）与闸门（只有 note，留给人）。
+执行者默认 AI——要人做的步骤显式写 executor: 人。
 """
 
-import re
-from dataclasses import dataclass
 from pathlib import Path
 
-STEP = re.compile(r"^###\s+(?P<name>.+?)\s*$")
+import yaml
+
+AI = "AI"
+HUMAN = "人"
+EXECUTORS = (AI, HUMAN)
+KINDS = ("机械", "闸门")
 
 
 def lab_data() -> Path:
@@ -27,98 +38,141 @@ def lab_data() -> Path:
     return Path(__file__).resolve().parents[2] / "data"
 
 
-AI = "AI"
-HUMAN = "人"
-EXECUTOR = re.compile(r"^-\s*执行者[：:]\s*(.+?)\s*$")
+class WorkflowError(ValueError):
+    """这份文件不像一份工作流。"""
 
 
-@dataclass(frozen=True)
+def dump(data: dict) -> str:
+    return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=200)
+
+
+def load(path: Path) -> dict:
+    """读一份定义：不是映射、缺字段、取值不对，当场报错。"""
+    try:
+        payload = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        raise WorkflowError(f"{Path(path).name} 不是合法的 YAML：{error}") from error
+    if not isinstance(payload, dict):
+        raise WorkflowError(f"{Path(path).name} 的顶层不是映射（name / steps）")
+    if not str(payload.get("name", "")).strip():
+        raise WorkflowError(f"{Path(path).name} 少了 name")
+    steps = payload.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise WorkflowError(f"{Path(path).name} 少了 steps（至少一个步骤）")
+    for index, step in enumerate(steps, start=1):
+        if not isinstance(step, dict) or not str(step.get("name", "")).strip():
+            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤少了 name")
+        executor = step.get("executor", AI)
+        if executor not in EXECUTORS:
+            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 executor 只能是 {' 或 '.join(EXECUTORS)}，实得 {executor!r}")
+        judges = step.get("judges") or []
+        if not isinstance(judges, list):
+            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 judges 应当是列表")
+        for judge in judges:
+            if not isinstance(judge, dict) or judge.get("kind") not in KINDS:
+                raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的判据 kind 只能是 {' 或 '.join(KINDS)}")
+            if judge["kind"] == "机械" and not str(judge.get("spec", "")).strip():
+                raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的机械判据少了 spec")
+    return payload
+
+
 class Step:
-    """一个工作步骤：叫什么、做什么、谁执行、怎么算完。
+    """一个工作步骤：叫什么、做什么、谁执行、怎么算完。"""
 
-    默认交给 AI 跑；要人做的步骤必须显式写「- 执行者：人」。
-    """
-
-    name: str
-    text: str
+    def __init__(self, payload: dict):
+        self.payload = payload
 
     @property
-    def executor(self) -> str:
-        for line in self.text.splitlines():
-            if match := EXECUTOR.match(line.strip()):
-                return match.group(1).strip()
-        return AI
-
-    @property
-    def human(self) -> bool:
-        return self.executor not in (AI, "ai", "AI 执行")
+    def name(self) -> str:
+        return str(self.payload.get("name", "")).strip()
 
     @property
     def what(self) -> str:
-        """做什么：判据行与执行者行之外的正文。"""
-        keep = [line for line in self.text.splitlines() if not line.strip().startswith("- [") and not EXECUTOR.match(line.strip())]
-        return "\n".join(keep).strip()
+        return str(self.payload.get("what", "")).strip()
 
     @property
-    def judges(self) -> str:
-        return "\n".join(line for line in self.text.splitlines() if line.strip().startswith("- ["))
+    def executor(self) -> str:
+        return self.payload.get("executor", AI)
+
+    @property
+    def human(self) -> bool:
+        return self.executor == HUMAN
+
+    @property
+    def judges(self) -> list[dict]:
+        return list(self.payload.get("judges") or [])
+
+    @property
+    def machine(self) -> list[dict]:
+        return [judge for judge in self.judges if judge.get("kind") == "机械"]
+
+    @property
+    def gates(self) -> list[dict]:
+        return [judge for judge in self.judges if judge.get("kind") == "闸门"]
 
 
-@dataclass
 class Workflow:
     """过程的编排定义：一串步骤。"""
 
-    data: Path
-    name: str
+    def __init__(self, data: Path, name: str, payload: dict | None = None):
+        self.data = Path(data)
+        self.name = name
+        self.payload = payload or {}
 
     @property
     def file(self) -> Path:
-        return self.data / "workflows" / f"{self.name}.md"
-
-    def text(self) -> str:
-        return self.file.read_text(encoding="utf-8") if self.file.is_file() else ""
+        return self.data / "workflows" / f"{self.name}.yaml"
 
     def exists(self) -> bool:
         return self.file.is_file()
 
+    def reload(self) -> "Workflow":
+        if self.exists():
+            self.payload = load(self.file)
+        return self
+
+    @property
+    def note(self) -> str:
+        return str(self.payload.get("note", "")).strip()
+
     def steps(self) -> list[Step]:
-        """步骤：按写进文件的顺序，每步连正文一起取下来。"""
-        found: list[Step] = []
-        for line in self.text().splitlines():
-            if match := STEP.match(line):
-                found.append(Step(match.group("name").strip(), ""))
-            elif found:
-                found[-1] = Step(found[-1].name, f"{found[-1].text}\n{line}".strip())
-        return found
+        """步骤：按定义里的顺序——这就是「串联」。"""
+        return [Step(item) for item in self.payload.get("steps", [])]
 
     def step(self, name: str) -> Step | None:
         return next((step for step in self.steps() if step.name == name), None)
 
+    def to_yaml(self) -> str:
+        return dump(self.payload)
+
 
 def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
-    """写下一条工作流：步骤串联，每步给一份验收骨架。"""
-    flow = Workflow(Path(data), name)
+    """写一条工作流：步骤串联，每步给一份判据骨架（执行者默认 AI）。"""
+    payload = {
+        "name": name,
+        "note": note or "步骤串联：写清每步做什么、谁执行、怎么算完。",
+        "steps": [
+            {
+                "name": step,
+                "what": f"<{step}这一步做什么>",
+                "executor": AI,
+                "judges": [
+                    {"kind": "机械", "note": "<能写成断言的>", "spec": "path:data/journal/README.md"},
+                    {"kind": "闸门", "note": "<只能人拍板的>"},
+                ],
+            }
+            for step in steps
+        ],
+    }
+    flow = Workflow(Path(data), name, payload)
     flow.file.parent.mkdir(parents=True, exist_ok=True)
-    body = [f"# 工作流：{name}", "", note or "步骤串联：写清每步做什么、怎么算完。", "", "## 步骤", ""]
-    for step in steps:
-        body += [
-            f"### {step}",
-            "",
-            f"- 做什么：<{step}这一步做什么>",
-            f"- 执行者：{AI}",
-            "- [ ] 机械：<能写成断言的> `path:data/journal/README.md`",
-            "- [ ] 闸门：<只能人拍板的>",
-            "",
-        ]
-    flow.file.write_text("\n".join(body).rstrip() + "\n", encoding="utf-8")
+    flow.file.write_text(flow.to_yaml(), encoding="utf-8")
     return flow
 
 
 def open_workflow(data: Path, name: str) -> Workflow:
-    return Workflow(Path(data), name)
-
-
-TITLE = re.compile(r"^#\s*工作流[：:]\s*(.*)$", re.M)
+    flow = Workflow(Path(data), name)
+    return flow.reload()
 
 
 def export(flow: Workflow, target: Path) -> Path:
@@ -127,27 +181,24 @@ def export(flow: Workflow, target: Path) -> Path:
     if target.is_dir():
         target = target / flow.file.name
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(flow.text(), encoding="utf-8")
+    target.write_text(flow.to_yaml(), encoding="utf-8")
     return target
 
 
 def import_workflow(data: Path, source: Path, name: str = "") -> Workflow:
-    """把一份工作流文件导进来：验一下有步骤，起个名字，落到 workflows/。"""
-    source = Path(source)
-    text = source.read_text(encoding="utf-8")
-    if not any(STEP.match(line) for line in text.splitlines()):
-        raise ValueError(f"{source.name} 里没有步骤（应以「### 步骤名」列出），不像一份工作流")
-    found = TITLE.search(text)
-    chosen = (name or (found.group(1).strip() if found else "") or source.stem).strip()
+    """把一份工作流导进来：先照 schema 验一遍，再起个名字落进 workflows/。"""
+    payload = load(Path(source))
+    chosen = (name or str(payload.get("name", "")).strip() or Path(source).stem).strip()
     flow = Workflow(Path(data), chosen)
     if flow.exists():
         raise FileExistsError(f"已经有一条工作流叫「{chosen}」：{flow.file}（换名字用 --as）")
+    payload["name"] = chosen
+    flow.payload = payload
     flow.file.parent.mkdir(parents=True, exist_ok=True)
-    text = TITLE.sub(f"# 工作流：{chosen}", text, count=1) if found else f"# 工作流：{chosen}\n\n{text}"
-    flow.file.write_text(text, encoding="utf-8")
+    flow.file.write_text(flow.to_yaml(), encoding="utf-8")
     return flow
 
 
 def listing(data: Path) -> list[Workflow]:
     base = Path(data) / "workflows"
-    return [Workflow(Path(data), path.stem) for path in sorted(base.glob("*.md"))] if base.is_dir() else []
+    return [open_workflow(data, path.stem) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []

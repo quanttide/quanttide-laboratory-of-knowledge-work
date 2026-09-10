@@ -1,0 +1,3 @@
+name: 数据归仓
+workflow: 数据归仓
+goal: 所有数据放实验室 data/，禁止过滤

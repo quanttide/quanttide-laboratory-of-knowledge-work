@@ -158,11 +158,10 @@ def workflow_show(data: Path, name: str) -> Result:
     flow = flow_layer.open_workflow(data, name)
     if not flow.exists():
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
-    result = Result(columns=("步骤", "怎么算完"), lines=[f"工作流：{flow.name}（{short(data, flow.file)}）"])
+    result = Result(columns=("步骤", "谁执行", "怎么算完"), lines=[f"工作流：{flow.name}（{short(data, flow.file)}）"])
     for step in flow.steps():
-        judges = len([line for line in step.judges.splitlines() if line.strip()])
-        result.rows.append((step.name, f"{judges} 条判据" if judges else "无判据"))
-        result.lines.append(f"  {step.name}：{judges} 条判据")
+        result.rows.append((step.name, step.executor, f"{len(step.machine)} 机械 / {len(step.gates)} 闸门"))
+        result.lines.append(f"  {step.name}：{step.executor}　{len(step.machine)} 机械 / {len(step.gates)} 闸门")
     return result
 
 
@@ -184,7 +183,7 @@ def workflow_import(data: Path, source: Path, name: str = "") -> Result:
     except (ValueError, FileExistsError) as error:
         return Result(ok=False, lines=[str(error)])
     result = workflow_show(data, flow.name)
-    result.lines.insert(0, f"已导入：{flow.source if hasattr(flow, 'source') else short(data, flow.file)}（步骤 {len(flow.steps())} 个）")
+    result.lines.insert(0, f"已导入：{short(data, flow.file)}（步骤 {len(flow.steps())} 个）")
     return result
 
 

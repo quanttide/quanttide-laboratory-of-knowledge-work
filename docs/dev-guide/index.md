@@ -11,13 +11,14 @@ src/kg/
 ├── report.py    动作结果与动作之间的接口：命令行与窗口共用的一层
 ├── assets.py    资产层：二十格、落点规则、工作区根
 ├── catalog.py   目录层：扫描成名字索引（收文件名与篇内标题）
-├── checks.py    判据：解析指令「验收」段里的机械核对并执行
+├── checks.py    判据：结构化判据（机械带 spec / 闸门只有说明）的执行
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
-├── records.py   记录的段位与骨架：任务三段（目标 / 步骤 / 验收）、报告四段（事件）、历史（叙事）
-├── task.py      任务：工作流的一次执行（状态、走一步、流水、报告、历史）
+├── records.py   记录的段位与骨架：报告（执行记录 + 闸门项）、历史（叙事）
+├── workflow.py  工作流（YAML）：schema 校验 + 串联的步骤（what / executor / judges）
+├── task.py      任务（YAML）：工作流的一次执行（状态、走一步、流水、报告、历史）
 └── __main__.py  python3 -m kg
 
-tests/test_kg.py       自带测试，30 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
+tests/test_kg.py       自带测试，39 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
 data/                  所有数据（工作纪律），按领域模型分三家：workflows/ 工作流定义、tasks/ 任务实例、artifacts/ 产物
 kg / kg-gui            本目录下的启动器（不必安装）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
@@ -67,7 +68,9 @@ pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 
 **⑨ 工作流可带走** —— `kg workflow --export <文件>` 原样存一份；`--import <文件> [--as 名字]` 导回来（先验「有没有 `### 步骤`」，重名挡、`--as` 换名）。换机器、换 `--data`、换仓库都能接着用；判据里的路径是那边的，导完要自己核一遍。
 
-**⑩ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：动作在真实工作区上稳定跑通；测试守着；任务的格式（三段）被真实交付用过至少一次（已有一件）。
+**⑩ 定义用 YAML** —— 工作流与任务改成 YAML：`workflow.py` 里带 schema 校验（顶层字段、步骤 name、executor 取值 AI|人、判据 kind 机械|闸门、机械必须有 spec），不合格当场报错；判据成了结构化字段（`checks.items_of`），不再从散文里猜。报告/历史仍是 Markdown、流水是 JSONL——记录与叙事是读物。
+
+**⑪ 毕业条件** —— 离开实验室、进工具箱仓（`packages/quanttide-work-toolkit`）之前要满足三条：动作在真实工作区上稳定跑通；测试守着；任务的格式（三段）被真实交付用过至少一次（已有一件）。
 
 ## 已决：曾经的重复
 

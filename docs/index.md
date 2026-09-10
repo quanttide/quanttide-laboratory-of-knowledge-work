@@ -20,7 +20,7 @@
 
 ## 工作流与任务
 
-**工作流**是过程的编排定义——一串步骤，每个步骤关联一个任务（`specification/process/workflow.md`）。
+**工作流**是过程的编排定义——一串步骤，用 YAML 存（字段与取值由 schema 定死，意义固定）（`specification/process/workflow.md`）。
 **任务**是干活的单位：目标 / 步骤 / 验收（`specification/process/task.md`）。
 
 程序**不预置编排**：一次运行的工作流写在自己的现场里，步骤关联哪些任务由现场说了算。

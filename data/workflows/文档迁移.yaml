@@ -1,0 +1,17 @@
+name: 文档迁移
+note: 步骤串联：写清每步做什么、怎么算完。
+steps:
+- name: 搬运
+  what: 搬运
+  executor: AI
+  judges:
+  - kind: 机械
+    note: 目标侧文件已就位
+    spec: path:examples/default/docs/index.md
+  - kind: 机械
+    note: 源侧文件已删除
+    spec: absent:/home/iguo/repos/quanttide/default/quanttide-tech/apps/qtdata/examples/default/modules/default.md
+  - kind: 闸门
+    note: 落点与源位置同构（源在 examples/，目标也在实验室）
+  - kind: 闸门
+    note: 命名沿用目标侧规则（英文文件名、中文标题）
