@@ -37,7 +37,7 @@ uv venv .venv && uv pip install -e ".[gui]"
 
 - `src/kg/` 程序：assets（契约层）、catalog（目录层）、checks（判据）、material（材料）、records（三种记录的段位与骨架）、report（动作结果与动作之间的接口，命令行与界面共用）、cli（命令行入口）、gui（窗口入口）
 - `samples/` 真实契约与案卷——判例，也是格式自证
-- `tests/` 自带测试：`python3 tests/test_kg.py`，17 项；装了 PySide6 窗口模块则多 4 项界面冒烟，不依赖 pytest
+- `tests/` 自带测试：`python3 tests/test_kg.py`，26 项；装了 PySide6 窗口模块则多 6 项界面冒烟，不依赖 pytest
 - `samples/` 真实契约与案卷——判例，也是格式自证
 - `docs/` 说明：模式与记录（index.md）、用户指南、开发计划
 

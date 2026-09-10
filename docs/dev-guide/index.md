@@ -16,7 +16,7 @@ src/kg/
 ├── records.py   三种记录：契约四段、案卷四段、一件事四段与骨架
 └── __main__.py  python3 -m kg
 
-tests/test_kg.py       自带测试，17 项（装 PySide6 窗口模块则多 4 项界面冒烟），不依赖 pytest
+tests/test_kg.py       自带测试，26 项（装 PySide6 窗口模块则多 6 项界面冒烟），不依赖 pytest
 samples/               真实契约与真实案卷（判例，也是格式自证）
 kg / kg-gui            本目录下的启动器（不必安装）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
