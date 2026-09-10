@@ -7,9 +7,19 @@
   python3 contract.py        打印契约并跑机械核对
 """
 
+import importlib.util
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+
+# 契约层的文件名与本文件同名，按文件路径显式加载，避免撞车
+_SPEC = importlib.util.spec_from_file_location(
+    "resolver_contract", Path(__file__).resolve().parent.parent / "resolver" / "contract.py"
+)
+resolver_contract = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(resolver_contract)
+
+repo_root = resolver_contract.repo_root
 
 
 @dataclass
@@ -43,22 +53,13 @@ class Contract:
         return [c for c in self.checks if not c.machine]
 
 
-def repo_root(start: Path | None = None) -> Path:
-    d = (start or Path(__file__)).resolve().parent
-    while not (d / "data" / "journal").is_dir():
-        if d == d.parent:
-            raise FileNotFoundError("未找到仓库根")
-        d = d.parent
-    return d
-
-
 # 真实契约：2026-09-10 把「Default 模块技术设计」从 quanttide-tech 迁入本领域
 MIGRATION = Contract(
     goal="把主体第二大脑里属于本领域的文档迁入本领域",
     output="目标侧一份 Markdown 文档；源侧净缩短；逐层指针更新",
     must_include=["归属判定（它是哪件资产）", "落点（与源位置同构）", "来源（原位置）"],
     checks=[
-        Check("目标侧文件已就位", lambda r: (r / "examples/default/examples/default-module/default.md").is_file()),
+        Check("目标侧文件已就位", lambda r: (r / "examples/default/docs/index.md").is_file()),
         Check("源侧文件已删除", lambda r: not (Path("/home/iguo/repos/quanttide/default/quanttide-tech") / "apps/qtdata/examples/default/modules/default.md").exists()),
         Check("落点与源位置同构（源在 examples/，目标也在实验室）"),
         Check("命名沿用目标侧规则（英文文件名、中文标题）"),

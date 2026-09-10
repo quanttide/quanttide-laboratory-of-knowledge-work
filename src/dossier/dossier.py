@@ -55,7 +55,7 @@ def today_dossier(root: Path) -> Dossier:
         goal=contract_layer.MIGRATION.goal,
         output_spec=contract_layer.MIGRATION.output,
         produced=[
-            "目标侧写入 `examples/default/examples/default-module/default.md`",
+            "目标侧写入 `examples/default/examples/default-module/default.md`（后随实验室重构移到 `docs/index.md`）",
             "改写为对外可读的设计：两种模式、三种记录、三个角色",
         ],
         review=[(check.what, True) for check in passed] + [(check.what, False) for check in failed],

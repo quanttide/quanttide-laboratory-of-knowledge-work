@@ -16,7 +16,7 @@ SAMPLES = (
     "data/profile/iGuo/course/production-internship.md",
     "data/profile/iGuo/org.md",
     "data/journal/iGuo/2026-09-10.md",              # 现场记录，偏原始
-    "examples/default/examples/default-module/default.md",  # 实验室里的设计稿
+    "examples/default/docs/index.md",                    # 实验室里的设计稿
 )
 
 

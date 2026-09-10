@@ -2,9 +2,10 @@
 
 量潮知识工作实验室——知识工作实验与原型。
 
-## 概述
+## 结构
 
-待补充
+- `src/` 代码：工具箱入口（kit/）、契约与目录两层库（resolver/）、三个实验（contract/、dossier/、material/）、测试（tests/）
+- `docs/` 说明：两种模式与三种记录（index.md）、用户指南（user-guide/）、开发计划（dev-guide/）
 
 ## 许可
 

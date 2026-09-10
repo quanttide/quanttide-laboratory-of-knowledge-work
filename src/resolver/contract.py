@@ -40,6 +40,16 @@ LOCATION = {  # 非同名目录的三格，按命名规则找独立仓库
 }
 
 
+def repo_root(start: Path | None = None) -> Path:
+    """仓库根：从当前文件往上找，直到看见数据层。"""
+    d = (start or Path(__file__)).resolve().parent
+    while not (d / "data" / "journal").is_dir():
+        if d == d.parent:
+            raise FileNotFoundError("未找到第二大脑仓库根")
+        d = d.parent
+    return d
+
+
 @dataclass(frozen=True)
 class Asset:
     kind: str  # 中文用名

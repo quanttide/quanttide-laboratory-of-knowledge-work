@@ -3,7 +3,7 @@
 **输出形态**：目标侧一份 Markdown 文档；源侧净缩短；逐层指针更新
 
 ## 生成者产出
-- 目标侧写入 `examples/default/examples/default-module/default.md`
+- 目标侧写入 `examples/default/examples/default-module/default.md`（后随实验室重构移到 `docs/index.md`）
 - 改写为对外可读的设计：两种模式、三种记录、三个角色
 
 ## 审查者报告
