@@ -11,6 +11,8 @@ uv pip install -e .       # 或装成命令：kg / kg-gui
 
 界面要 PySide6 的窗口模块；缺了就在实验室内建个虚拟环境：`uv venv .venv && uv pip install -e '.[gui]'`，然后 `.venv/bin/kg-gui`。
 
+走一遍看这里：[过程](process.md)——先串步骤、再执行，拿课程档案比对那次真事说话（写工作流可改、起任务复用、走一步、看、收尾）。
+
 ## 工作流：串联的步骤（定义）
 
 ```bash
