@@ -3,11 +3,11 @@
 规格：任务（Task）＝过程的一次执行实例；它跑的是某条工作流（workflow.py）。
 
 <数据仓>/
-├── tasks/<任务>.yaml         这一次的指令：跑哪条工作流、要什么
-└── artifacts/<任务>/
-    ├── log.jsonl             执行记录：哪一步、什么时候、结果如何、一句话
-    ├── report.md             报告（事件）：执行记录 + 闸门项，机器写
-    └── history.md            历史（叙事）：人写
+├── tasks/<任务>.yaml           这一次的指令：跑哪条工作流、要什么
+└── artifacts/                  产物按类型分家，按任务名命名
+    ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项，机器写
+    ├── history/<任务>.md       历史（叙事）：人写
+    └── log/<任务>.jsonl        流水：哪一步、什么时候、结果如何、一句话
 
 任务是 YAML（跑哪条工作流、要什么），定义是 YAML（步骤、执行者、判据——见 workflow.py）；
 流水是 JSONL、报告与历史是 Markdown——那是记录与叙事，读物。
@@ -26,9 +26,10 @@ from . import checks as checks_layer
 from . import records
 from . import workflow as workflow_layer
 
-LOG = "log.jsonl"
-REPORT = "report.md"
-HISTORY = "history.md"
+LOG = "log"
+REPORT = "report"
+HISTORY = "history"
+SUFFIX = {REPORT: ".md", HISTORY: ".md", LOG: ".jsonl"}
 def dump(data: dict) -> str:
     return yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=200)
 
@@ -51,10 +52,11 @@ class Task:
 
     @property
     def artifacts_dir(self) -> Path:
-        return self.data / "artifacts" / self.name
+        return self.data / "artifacts"
 
     def artifact(self, kind: str) -> Path:
-        return self.artifacts_dir / kind
+        """程序的三样记账：一类一目录（report / history / log），按任务名放。"""
+        return self.artifacts_dir / kind / f"{self.name}{SUFFIX[kind]}"
 
     def exists(self) -> bool:
         return self.file.is_file()
@@ -94,7 +96,7 @@ class Task:
         return next((step for step in self.steps() if step.name not in done), None)
 
     def record(self, step: str, detail: str, ok: bool = True) -> None:
-        self.artifacts_dir.mkdir(parents=True, exist_ok=True)
+        self.artifact(LOG).parent.mkdir(parents=True, exist_ok=True)
         with self.artifact(LOG).open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"at": now(), "step": step, "detail": detail, "ok": ok}, ensure_ascii=False) + "\n")
 
@@ -107,6 +109,8 @@ def create(root: Path, data: Path, name: str, workflow_name: str, about: str = "
     task = Task(root, Path(data), name)
     task.file.parent.mkdir(parents=True, exist_ok=True)
     task.artifacts_dir.mkdir(parents=True, exist_ok=True)
+    for kind in (REPORT, HISTORY, LOG):
+        task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
         task.file.write_text(dump({"name": name, "workflow": workflow_name, "goal": about or "<这一次要什么，一句话>"}), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
@@ -142,7 +146,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
 {criteria_text(step)}
 
-产物落在：{task.artifacts_dir}
+程序自己的记账落在：{task.artifacts_dir}（report / history / log，按下任务名）——这一步的产物按上面「做什么」里写明的地方落
 规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """
 

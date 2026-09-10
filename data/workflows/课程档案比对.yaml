@@ -14,14 +14,14 @@ steps:
 - name: 比对
   executor: agent
   criteria:
-  - path: examples/default/data/artifacts/课程档案比对/比对.md
+  - path: examples/default/data/artifacts/report/比对.md
     description: 产物落成
     executor: rule
-  - file: examples/default/data/artifacts/课程档案比对/比对.md
+  - file: examples/default/data/artifacts/report/比对.md
     contains: production-internship
     description: 产物点到两边的课
     executor: rule
-  - file: examples/default/data/artifacts/课程档案比对/比对.md
+  - file: examples/default/data/artifacts/report/比对.md
     contains: 缺口
     description: 产物给了两侧缺口
     executor: rule
@@ -29,7 +29,7 @@ steps:
 - name: 结论
   executor: agent
   criteria:
-  - file: examples/default/data/artifacts/课程档案比对/比对.md
+  - file: examples/default/data/artifacts/report/比对.md
     contains: '## 结论'
     description: 结论写进产物
     executor: rule

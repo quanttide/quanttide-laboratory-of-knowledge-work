@@ -10,10 +10,10 @@
 data/
 ├── workflows/<工作流>.yaml      工作流：串联的步骤（name / what / executor / judges）
 ├── tasks/<任务>.yaml            任务：工作流的一次执行（workflow、goal）
-└── artifacts/<任务>/
-    ├── log.jsonl              执行记录
-    ├── report.md              报告（事件）：执行记录 + 闸门项
-    └── history.md             历史（叙事）
+└── artifacts/                 产物按类型分家，按任务名命名
+    ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项
+    ├── history/<任务>.md       历史（叙事）
+    └── log/<任务>.jsonl        流水
 ```
 
 目录按领域模型分三家：workflows（过程的编排定义）、tasks（工作流的一次执行实例）、artifacts（产物）。

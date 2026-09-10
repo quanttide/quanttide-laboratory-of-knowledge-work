@@ -4,8 +4,8 @@ steps:
 - name: 问候
   executor: agent
   criteria:
-  - file: examples/default/data/artifacts/AI冒烟/问候.md
+  - file: examples/default/data/artifacts/report/问候.md
     contains: 你好
     description: 问候落在
     executor: rule
-  description: 在 `examples/default/data/artifacts/AI冒烟/问候.md` 里写一行中文问候（就一行，别的什么都不要做）
+  description: 在 `examples/default/data/artifacts/report/问候.md` 里写一行中文问候（就一行，别的什么都不要做）

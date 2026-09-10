@@ -181,15 +181,16 @@ def flow_and_task(real: Path) -> None:
         test("走一步：记账了", len(task.events()) == 3, f"实得 {len(task.events())}")
         test("走一步：下一步只剩结论", task.next_step().name == "结论")
 
-        written = task.artifact("report.md").read_text(encoding="utf-8")
+        written = task.artifact("report").read_text(encoding="utf-8")
         test("报告：执行记录写下来了", "## 执行记录" in written and "比对" in written)
         test("报告：闸门项留给人", "## 闸门项" in written and "⧗" in written)
 
         report.task_history(root, data, "试一次", "先串步骤，再执行。")
-        test("历史：叙事进 artifacts", records.prose(task.artifact("history.md")) != "")
+        test("历史：叙事进 artifacts", records.prose(task.artifact("history")) != "")
         test("列任务：报工作流与下一步", report.task_list(root, data).rows[0][1] == "试一条")
         test("工作流里没有的步骤就报错", not report.task_step(root, data, "试一次", "乱来", "", None) if False else not report.task_step(root, data, "试一次", "乱来").ok)
         test("数据分三家放", task.file.is_relative_to(data / "tasks") and flow.file.is_relative_to(data / "workflows") and task.artifacts_dir.is_relative_to(data / "artifacts"))
+        test("记账一类一目录、按任务名", task.artifact("report").name == "试一次.md" and task.artifact("report").parent.name == "report" and task.artifact("log").name == "试一次.jsonl" and task.artifact("log").parent.name == "log", str(task.artifact("report")))
 
 
 def carry(real: Path) -> None:

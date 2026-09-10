@@ -117,9 +117,9 @@ $ kg task AI冒烟 --next
 $ kg task 课程档案比对
   ✓ 定位   ✓ 比对   ✓ 结论
 3 个步骤都走过了
-产物：artifacts/课程档案比对/report.md、artifacts/课程档案比对/history.md
+产物：artifacts/report/课程档案比对.md、artifacts/history/课程档案比对.md
 
-$ cat data/artifacts/课程档案比对/report.md     # 执行记录 + 闸门项，机器写
+$ cat data/artifacts/report/课程档案比对.md     # 执行记录 + 闸门项，机器写
 ```
 
 ## 五、收尾
@@ -135,7 +135,9 @@ $ kg task 课程档案比对 --history "先找齐两边，再按口径 / 重叠 
 ```text
 data/workflows/<工作流>.yaml   定义（YAML）：串联的步骤、执行者、判据
 data/tasks/<任务>.yaml         实例（YAML）：跑哪条工作流、要什么
-data/artifacts/<任务>/         产物：log.jsonl（流水）、report.md（事件）、history.md（叙事）
+data/artifacts/report/<任务>.md   报告（事件）：执行记录 + 闸门项，机器写
+data/artifacts/history/<任务>.md  历史（叙事）：人写
+data/artifacts/log/<任务>.jsonl   流水：哪一步、什么时候、结果如何
 ```
 
 ## 窗口里也一样
