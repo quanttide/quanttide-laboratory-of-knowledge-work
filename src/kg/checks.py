@@ -1,6 +1,6 @@
 """判据：跑定义里写下的机械核对。
 
-判据是结构化字段（`kind: 机械` + `spec`），不是从散文里猜出来的。
+判据是结构化字段（`type: rule` + `spec`），不是从散文里猜出来的。
 spec 四种——路径相对工作区根，写绝对路径则按绝对路径（跨仓库核对用）：
 
   path:<路径>          路径存在
@@ -28,9 +28,12 @@ class Item:
         return self.spec is not None
 
 
-def items_of(judges: list[dict]) -> list[Item]:
-    """把定义里的判据（机械 / 闸门）翻成要跑的东西。"""
-    return [Item(str(judge.get("note", "")).strip(), str(judge["spec"]).strip() if judge.get("kind") == "机械" else None) for judge in judges]
+def items_of(criteria: list[dict]) -> list[Item]:
+    """把定义里的判据翻成要跑的东西：type=rule 的带 spec 跑，其余不跑（agent 交 AI、human 留给人）。"""
+    return [
+        Item(str(criterion.get("note", "")).strip(), str(criterion.get("spec", "")).strip() if criterion.get("type") == "rule" else None)
+        for criterion in criteria
+    ]
 
 
 def check(root: Path, spec: str) -> tuple[bool, str]:

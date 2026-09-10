@@ -140,7 +140,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 {step.what}
 
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
-{step.judges or "（这一步没有机械判据，判断留给人）"}
+{criteria_text(step)}
 
 产物落在：{task.artifacts_dir}
 规矩：数据只写数据仓；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
@@ -157,6 +157,49 @@ def run_ai(prompt: str, root: Path, timeout: int = 900) -> tuple[bool, str]:
         return False, "pi 超时"
     out = (done.stdout or "").strip() or (done.stderr or "").strip()
     return done.returncode == 0, out
+
+
+def criteria_text(step: workflow_layer.Step) -> str:
+    lines = [f"- {criterion.get('type')}：{criterion.get('note')}" + (f"（{criterion['spec']}）" if criterion.get("spec") else "") for criterion in step.criteria]
+    return "\n".join(lines) or "（这一步没有判据）"
+
+
+def judge_prompt(task: "Task", step: workflow_layer.Step, criteria: list[dict]) -> str:
+    """交给智能体审的那一段话：产物 + 判准，逐条回答。"""
+    listed = "\n".join(f"{index}. {criterion.get('note')}" for index, criterion in enumerate(criteria, start=1))
+    return f"""你是审查者，不是执行者。别改产物、别改判据文件。
+
+工作区：{task.root}
+要审的东西：这一步的产物在 {task.artifacts_dir}（也可以看工作区里相关文件）
+这一步做什么：{step.what}
+
+判准（逐条判）：
+{listed}
+
+对每条输出一行，格式只能是「序号. 通过 — 一句话理由」或「序号. 不通过 — 一句话理由」，最后不要写别的。
+"""
+
+
+def judge_by_ai(task: "Task", step: workflow_layer.Step, criteria: list[dict], root: Path) -> list[tuple[str, str, str]]:
+    """让智能体按判准审一遍；返回（说明，结论，理由）。"""
+    ran, out = run_ai(judge_prompt(task, step, criteria), root)
+    rows = []
+    for index, criterion in enumerate(criteria, start=1):
+        note = str(criterion.get("note", "")).strip()
+        if not ran:
+            rows.append((note, "待判", f"智能体没跑成：{one_line(out)}"))
+            continue
+        verdict, reason = "待判", one_line(out)
+        for line in out.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(f"{index}."):
+                tail = stripped.split(".", 1)[1].strip()
+                verdict = "✓" if tail.startswith("通过") else "✗" if tail.startswith("不通过") else "待判"
+                reason = tail
+                break
+        rows.append((note, verdict, reason))
+    task.record(f"{step.name}·审", f"AI 审查（同一模型）：{'；'.join(f'{note}→{verdict}' for note, verdict, _ in rows)}", ok=all(verdict == "✓" for _, verdict, _ in rows))
+    return rows
 
 
 def one_line(text: str, limit: int = 80) -> str:
@@ -182,26 +225,32 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     elif found.human and auto:
         lines.append(f"{found.name}：这一步的执行者是人（{found.executor}）——轮到你，做完用 kg task <名字> --done {found.name}")
         return True, lines, []
-    results, gates = checks_layer.run(root, checks_layer.items_of(found.judges))
-    ok = all(passed for _, passed, _ in results)
+    results, _ = checks_layer.run(root, checks_layer.items_of(found.rules))
+    judged = judge_by_ai(task, found, found.agents, root) if (auto and found.agents) else [
+        (str(criterion.get("note", "")).strip(), "待判", "没跑智能体（人为地记一步）") for criterion in found.agents
+    ]
+    gates = [str(criterion.get("note", "")).strip() for criterion in found.gates]
+    ok = all(passed for _, passed, _ in results) and all(verdict == "✓" for _, verdict, _ in judged)
     detail = note.strip() or ("；".join(item.note for item, _, _ in results) if results else "做完")
     if not (auto and not found.human):
         task.record(step, detail, ok=ok)
-    write_report(task, gates)
+    write_report(task, gates + [note for note, verdict, _ in judged if verdict != "✓"])
     lines.append(f"{'✓' if ok else '✗'} {step}：{detail}")
     lines += [f"  {'✓' if passed else '✗'} {item.note}（{spec}）" for item, passed, spec in results]
-    lines += [f"  ⧗ {item.note}（留给闸门）" for item in gates]
+    lines += [f"  {verdict} {note}（{reason}）" for note, verdict, reason in judged]
+    lines += [f"  ⧗ {note}（留给人）" for note in gates]
     rows = [(item.note, "✓" if passed else "✗", spec) for item, passed, spec in results]
-    return ok, lines, rows + [(item.note, "闸门", "留给人拍板") for item in gates]
+    rows += [(note, verdict, reason) for note, verdict, reason in judged]
+    return ok, lines, rows + [(note, "闸门", "留给人拍板") for note in gates]
 
 
-def write_report(task: Task, gates: list) -> Path:
+def write_report(task: Task, gates: list[str]) -> Path:
     """报告：执行记录（每步一行）+ 闸门项（留给人）。"""
     lines = [f"# 报告：{task.name}", "", "## 执行记录", ""]
     for event in task.events():
         lines.append(f"- {'✓' if event.get('ok') else '✗'} {event['at']}　{event['step']}　{event['detail']}")
     lines += ["", "## 闸门项", ""]
-    lines += [f"- ⧗ {item.note}（留给闸门）" for item in gates] or ["- （暂无）"]
+    lines += [f"- ⧗ {note}（留给人 / 待判）" for note in gates] or ["- （暂无）"]
     path = task.artifact(REPORT)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

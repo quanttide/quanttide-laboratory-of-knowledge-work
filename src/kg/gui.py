@@ -433,9 +433,9 @@ class Desk(QWidget):
         steps = self.task.steps()
         self.steps_table.setRowCount(len(steps))
         for row, step in enumerate(steps):
-            counts = f"{len(step.machine)} 机械" + (f" / {len(step.gates)} 闸门" if step.gates else "")
+            counts = f"{len(step.rules)} rule / {len(step.agents)} agent / {len(step.gates)} human"
             self.steps_table.setItem(row, 0, QTableWidgetItem(step.name))
-            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{step.executor}　{counts}" if step.judges else step.executor))
+            self.steps_table.setItem(row, 1, QTableWidgetItem(f"{step.executor}　{counts}" if step.criteria else step.executor))
             self.steps_table.setItem(row, 2, QTableWidgetItem("✓" if step.name in done else "—"))
         if steps and self.steps_table.currentRow() < 0:
             nxt = self.task.next_step()

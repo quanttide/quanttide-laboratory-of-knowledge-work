@@ -2,35 +2,36 @@
 
 规格：工作流（Workflow）＝过程的编排定义；任务（Task）＝过程的一次执行实例（见 task.py）。
 
-定义要有**固定的意义**，所以是 YAML 而不是散文：字段名、取值、判据种类都由 schema 定死。
+定义要有**固定的意义**，所以是 YAML 而不是散文：字段名、字段取值、判据种类都由 schema 定死，不认识的字段直接报错。
 
 <数据仓>/workflows/<名字>.yaml
 
   name: 课程档案比对
-  note: 比对两边的档案
+  description: 比对两边的档案
   steps:
     - name: 定位
       what: 把两边的源找齐
-      executor: AI          # AI | 人
-      judges:
-        - kind: 机械
+      executor: 智能体
+      criteria:
+        - type: rule
           note: 个人课程档案在
           spec: path:data/profile/iGuo/course/index.md
-        - kind: 闸门
+        - type: human
           note: 创始人点头（回流与并法怎么定）
-
-判据两种（kind）：机械（带 spec，程序当场判）与闸门（只有 note，留给人）。
-执行者默认 AI——要人做的步骤显式写 executor: 人。
 """
 
 from pathlib import Path
 
 import yaml
 
-AI = "AI"
-HUMAN = "人"
-EXECUTORS = (AI, HUMAN)
-KINDS = ("机械", "闸门")
+AGENT = "agent"
+HUMAN = "human"
+RULE = "rule"
+EXECUTORS = (AGENT, HUMAN)
+TYPES = (RULE, AGENT, HUMAN)
+TOP_FIELDS = ("name", "description", "steps")
+STEP_FIELDS = ("name", "what", "executor", "criteria")
+CRITERION_FIELDS = ("type", "note", "spec")
 
 
 def lab_data() -> Path:
@@ -59,20 +60,32 @@ def load(path: Path) -> dict:
     steps = payload.get("steps")
     if not isinstance(steps, list) or not steps:
         raise WorkflowError(f"{Path(path).name} 少了 steps（至少一个步骤）")
+    unknown = [key for key in payload if key not in TOP_FIELDS]
+    if unknown:
+        raise WorkflowError(f"{Path(path).name} 顶层有不认识的字段：{'、'.join(unknown)}（只认 {'、'.join(TOP_FIELDS)}）")
     for index, step in enumerate(steps, start=1):
         if not isinstance(step, dict) or not str(step.get("name", "")).strip():
             raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤少了 name")
-        executor = step.get("executor", AI)
+        extra = [key for key in step if key not in STEP_FIELDS]
+        if extra:
+            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤有不认识的字段：{'、'.join(extra)}（只认 {'、'.join(STEP_FIELDS)}）")
+        executor = step.get("executor", AGENT)
         if executor not in EXECUTORS:
             raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 executor 只能是 {' 或 '.join(EXECUTORS)}，实得 {executor!r}")
-        judges = step.get("judges") or []
-        if not isinstance(judges, list):
-            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 judges 应当是列表")
-        for judge in judges:
-            if not isinstance(judge, dict) or judge.get("kind") not in KINDS:
-                raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的判据 kind 只能是 {' 或 '.join(KINDS)}")
-            if judge["kind"] == "机械" and not str(judge.get("spec", "")).strip():
-                raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的机械判据少了 spec")
+        criteria = step.get("criteria") or []
+        if not isinstance(criteria, list):
+            raise WorkflowError(f"{Path(path).name} 第 {index} 个步骤的 criteria 应当是列表")
+        for order, criterion in enumerate(criteria, start=1):
+            where = f"第 {index} 个步骤第 {order} 条判据"
+            if not isinstance(criterion, dict) or criterion.get("type") not in TYPES:
+                raise WorkflowError(f"{Path(path).name} {where}的 type 只能是 {' / '.join(TYPES)}")
+            odd = [key for key in criterion if key not in CRITERION_FIELDS]
+            if odd:
+                raise WorkflowError(f"{Path(path).name} {where}有不认识的字段：{'、'.join(odd)}（只认 {'、'.join(CRITERION_FIELDS)}）")
+            if not str(criterion.get("note", "")).strip():
+                raise WorkflowError(f"{Path(path).name} {where}少了 note")
+            if criterion["type"] == RULE and not str(criterion.get("spec", "")).strip():
+                raise WorkflowError(f"{Path(path).name} {where}是 rule，必须带 spec")
     return payload
 
 
@@ -92,23 +105,30 @@ class Step:
 
     @property
     def executor(self) -> str:
-        return self.payload.get("executor", AI)
+        return self.payload.get("executor", AGENT)
 
     @property
     def human(self) -> bool:
         return self.executor == HUMAN
 
     @property
-    def judges(self) -> list[dict]:
-        return list(self.payload.get("judges") or [])
+    def criteria(self) -> list[dict]:
+        return list(self.payload.get("criteria") or [])
+
+    def of(self, kind: str) -> list[dict]:
+        return [criterion for criterion in self.criteria if criterion.get("type") == kind]
 
     @property
-    def machine(self) -> list[dict]:
-        return [judge for judge in self.judges if judge.get("kind") == "机械"]
+    def rules(self) -> list[dict]:
+        return self.of(RULE)
+
+    @property
+    def agents(self) -> list[dict]:
+        return self.of(AGENT)
 
     @property
     def gates(self) -> list[dict]:
-        return [judge for judge in self.judges if judge.get("kind") == "闸门"]
+        return self.of(HUMAN)
 
 
 class Workflow:
@@ -132,8 +152,8 @@ class Workflow:
         return self
 
     @property
-    def note(self) -> str:
-        return str(self.payload.get("note", "")).strip()
+    def description(self) -> str:
+        return str(self.payload.get("description", "")).strip()
 
     def steps(self) -> list[Step]:
         """步骤：按定义里的顺序——这就是「串联」。"""
@@ -150,15 +170,15 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
     """写一条工作流：步骤串联，每步给一份判据骨架（执行者默认 AI）。"""
     payload = {
         "name": name,
-        "note": note or "步骤串联：写清每步做什么、谁执行、怎么算完。",
+        "description": note or "步骤串联：写清每步做什么、谁执行、怎么判。",
         "steps": [
             {
                 "name": step,
                 "what": f"<{step}这一步做什么>",
-                "executor": AI,
-                "judges": [
-                    {"kind": "机械", "note": "<能写成断言的>", "spec": "path:data/journal/README.md"},
-                    {"kind": "闸门", "note": "<只能人拍板的>"},
+                "executor": AGENT,
+                "criteria": [
+                    {"type": RULE, "note": "<能写成断言的>", "spec": "path:data/journal/README.md"},
+                    {"type": HUMAN, "note": "<只能人拍板的>"},
                 ],
             }
             for step in steps

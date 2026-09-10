@@ -1,31 +1,31 @@
 name: 数据归仓
-note: 步骤串联：写清每步做什么、怎么算完。
+description: 步骤串联：写清每步做什么、怎么算完。
 steps:
 - name: 材料
   what: 材料
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 指令
   what: 指令
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 核对
   what: 核对
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 产出
   what: 产出
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 裁决
   what: 裁决
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 成果
   what: 成果
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []
 - name: 历史
   what: 历史
-  executor: AI
-  judges: []
+  executor: agent
+  criteria: []

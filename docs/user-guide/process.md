@@ -13,37 +13,47 @@ $ kg workflow --new 课程档案比对 --steps 定位,比对,结论 --note "比�
 
 ```yaml
 name: 课程档案比对
-note: 比对两边的档案
+description: 比对两边的档案
 steps:
   - name: 定位
     what: 把两边的源找齐
-    executor: AI                # AI | 人；默认 AI
-    judges:
-      - kind: 机械              # 机械：程序当场判
+    executor: agent             # agent | human；默认 agent
+    criteria:
+      - type: rule              # rule：程序跑下面的 spec
         note: 个人课程档案在
         spec: path:data/profile/iGuo/course/index.md
-      - kind: 机械
+      - type: rule
         note: 课程研发档案在
         spec: path:/home/iguo/repos/quanttide/domains/quanttide-course/data/profile/README.md
   - name: 核对
     what: 逐项对照，落成一件产物
-    executor: 人                 # 要人做必须显式写
-    judges:
-      - kind: 机械
+    executor: human             # 要人做必须显式写
+    criteria:
+      - type: rule
         note: 产物落成
         spec: path:examples/default/data/artifacts/课程档案比对/比对.md
-      - kind: 闸门               # 闸门：只有说明，留给人拍板
+      - type: agent             # agent：智能体照 note 的判准审
+        note: 两边口径是否对齐
+      - type: human             # human：留给人拍板
         note: 创始人点头（回流与并法怎么定）
 ```
 
-判据两种：**机械**（带 `spec`，程序当场判）与**闸门**（只有说明，留给人）。`spec` 四样：`` `path:` `` 存在、`` `absent:` `` 不存在、`` `contains:文件=文字` `` 含某段文字、`` `run:命令` `` 退出码为零；路径相对工作区根（写绝对路径则按绝对路径，跨仓库核对用）。
+**谁判，按主体分三类**（`type`，取值英文标识）：
 
-不合格的 YAML 会被挡回来（少了 `name`、`steps`、步骤少了 `name`、`executor` 不是 `AI|人`、判据 `kind` 不是 `机械|闸门`、机械判据少了 `spec`）——不是「像不像」，是**合不合 schema**。
+| type | 谁判 | 怎么判 |
+|---|---|---|
+| `rule` | 规则引擎（程序） | 跑 `spec`，四种写法：`` `path:` `` 存在、`` `absent:` `` 不存在、`` `contains:文件=文字` `` 含某段文字、`` `run:命令` `` 退出码为零；路径相对工作区根（绝对路径则按绝对路径，跨仓库核对用） |
+| `agent` | 智能体 | 程序把产物与 `note`（判准）交给 `pi -p`，要它逐条回答「通过 / 不通过 + 一句理由」 |
+| `human` | 人类 | 不跑，原样进报告的「闸门项」等人拍板 |
 
-**可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
+**谁做**（`executor`）也是这两类：`agent`（默认）或 `human`。
+
+不合格的 YAML 一律挡回来，而且**不认识的字段直接报错**（不是忽略）：顶层只认 `name / description / steps`，步骤只认 `name / what / executor / criteria`，判据只认 `type / note / spec`；`type` 只能三选一、`rule` 必须带 `spec`、`note` 不能空。不是「像不像」，是**合不合 schema**。
+
+**可改**就在这儿：加一步、去一步、换顺序、改判据、换执行者与判据主体——动这份 YAML 就行，程序一行不用改；进 git 能 diff、能回退。
 
 ```bash
-$ kg workflow 课程档案比对      # 看步骤、谁执行、几条机械几条闸门
+$ kg workflow 课程档案比对      # 看步骤、谁执行、几条 rule / agent / human
 $ kg workflow --list           # 有哪些工作流
 ```
 
@@ -129,7 +139,8 @@ data/artifacts/<任务>/         产物：log.jsonl（流水）、report.md（�
 
 ## 规矩
 
-- **能用 AI 跑的都用 AI**：步骤默认 `执行者：AI`；人只留在闸门（拍板、判断型验收）；
+- **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `type: human` 的判据上（拍板）；
+- **智能体不能审自己那一步**——同一步的执行者与判据若是同一个智能体，等于自评自过（现在实现里是同一个 pi，流水里标了「AI 审查（同一模型）」，将来要换成另一个执行者）；
 
 - **数据全落 `data/`**（workflows / tasks / artifacts 三家），不写实验室外面；
 - **定义用 YAML、记录用 Markdown**：编排与判据是定义（schema 定死），报告与历史是记录（读得顺）；

@@ -160,8 +160,9 @@ def workflow_show(data: Path, name: str) -> Result:
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
     result = Result(columns=("步骤", "谁执行", "怎么算完"), lines=[f"工作流：{flow.name}（{short(data, flow.file)}）"])
     for step in flow.steps():
-        result.rows.append((step.name, step.executor, f"{len(step.machine)} 机械 / {len(step.gates)} 闸门"))
-        result.lines.append(f"  {step.name}：{step.executor}　{len(step.machine)} 机械 / {len(step.gates)} 闸门")
+        counts = f"{len(step.rules)} rule / {len(step.agents)} agent / {len(step.gates)} human"
+        result.rows.append((step.name, step.executor, counts))
+        result.lines.append(f"  {step.name}：{step.executor}　{counts}")
     return result
 
 

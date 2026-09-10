@@ -18,7 +18,9 @@ data/
 
 目录按领域模型分三家：workflows（过程的编排定义）、tasks（工作流的一次执行实例）、artifacts（产物）。
 
-**定义用 YAML，记录用 Markdown**：工作流与任务要「意义固定」（字段、取值、判据种类由 schema 定死），所以是 YAML；报告与历史是读物与叙事，仍是 Markdown；流水是 JSONL。
+**定义用 YAML，记录用 Markdown**：工作流与任务要「意义固定」（字段、取值由 schema 定死），所以是 YAML；报告与历史是读物与叙事，仍是 Markdown；流水是 JSONL。
+
+**判据按主体分三类，取值英文标识**：`rule`（规则引擎跑 spec）、`agent`（智能体照判准审）、`human`（留给人）；执行者 `executor: agent|human`。不认识的字段直接报错，不许默默忽略。
 
 程序默认就写在这里（`kg --data`，缺省即本仓 `data/`）；要写别处必须显式指路。
 

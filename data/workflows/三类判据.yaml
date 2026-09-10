@@ -1,0 +1,14 @@
+name: 三类判据
+description: 试三种判据：rule 当场判、agent 照判准审、human 留给人
+steps:
+- name: 写一句
+  what: 在 examples/default/data/artifacts/三类判据/话.md 里写一行中文（就一行）
+  executor: agent
+  criteria:
+  - type: rule
+    note: 话落在
+    spec: path:examples/default/data/artifacts/三类判据/话.md
+  - type: agent
+    note: 内容是中文且只有一行
+  - type: human
+    note: 创始人认可
