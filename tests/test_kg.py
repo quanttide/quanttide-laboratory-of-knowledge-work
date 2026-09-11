@@ -308,6 +308,15 @@ def recorded_context(real: Path) -> None:
         given = task_layer.reopen(data, "试一次", root, None)
         test("上下文：命令行给了就优先", given.root == root and given.workflows == flows, str(given.root))
 
+        # 不带 --root 走一步：判据要在任务记着的工作区里核（曾把 None 当工作区用，报 TypeError）
+        real_ai = task_layer.run_ai
+        task_layer.run_ai = lambda prompt, where, timeout=900: (True, "我把这一步做完了")
+        try:
+            stepped = report.task_step(None, data, "试一次", "一步")
+        finally:
+            task_layer.run_ai = real_ai
+        test("上下文：不带 --root 也走得动一步", stepped.ok, str(stepped.lines[:3]))
+
 
 def split_dirs(real: Path) -> None:
     """定义与草稿分家：工作流放在固定资产目录，任务与产物落在数据仓。"""

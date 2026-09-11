@@ -260,7 +260,7 @@ def task_step(root: Path | None, data: Path, name: str, step: str = "", note: st
         if nxt is None:
             return Result(lines=["所有步骤都走过了"])
         step = nxt.name
-    ok, lines, rows = task_layer.execute(task, root, step.strip(), note, auto=auto)
+    ok, lines, rows = task_layer.execute(task, task.root, step.strip(), note, auto=auto)  # 用任务记着的工作区，命令行没给也算
     result = Result(ok=ok, lines=lines, columns=MECHANICAL, rows=rows)
     result.lines.append(task_layer.state_line(task))
     return result
