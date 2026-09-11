@@ -20,7 +20,6 @@ from kg import assets as assets_layer  # noqa: E402
 from kg import catalog as catalog_layer  # noqa: E402
 from kg import checks as checks_layer  # noqa: E402
 from kg import cli, material as material_layer  # noqa: E402
-from kg import records  # noqa: E402
 from kg import report  # noqa: E402
 from kg import task as task_layer  # noqa: E402
 from kg import workflow as flow_layer  # noqa: E402
@@ -165,7 +164,7 @@ def flow_and_task(real: Path) -> None:
              any("工作流：试一条" in line for line in started.lines) and any("指令：" in line for line in started.lines),
              str(started.lines[:4]))
         test("任务文件 = name + start + workflow + 运行上下文 + 流水",
-             set(task.payload()) == {"name", "start", "workflow", "root", "data", "workflows", "log"}, str(task.payload()))
+             set(task.payload()) == {"name", "start", "workflow", "root", "data", "workflows", "log", "gates", "products"}, str(task.payload()))
         test("开工记成 start 字段（不是流水里的一步）", task.start() != "" and "开工" not in [e["step"] for e in task.events()], str(task.payload()["start"]))
         test("流水记在任务文件里（不再另开 jsonl）", task.artifact("log") == task.file, str(task.events()[:1]))
         test("任务：起时只记 start，不记流水", task.start() != "" and task.events() == [])
@@ -188,27 +187,28 @@ def flow_and_task(real: Path) -> None:
         test("走一步：记账了", len(task.events()) == 2, f"实得 {len(task.events())}")
         test("走一步：下一步只剩结论", task.next_step().name == "结论")
 
-        written = task.artifact("report").read_text(encoding="utf-8")
-        test("报告：执行记录写下来了", "## 执行记录" in written and "比对" in written)
-        test("报告：闸门项留给人", "## 闸门项" in written and "⧗" in written)
-
-        # 产物可维护：程序只动自己两节，别的节留着；占位能指到本任务的产物
+        # 产物由写它的人来写：程序不建骨架、不写任何一节
         report_file = task.artifact("report")
-        report_file.write_text(report_file.read_text(encoding="utf-8") + "\n## 产物：对照\n\n人写的内容\n", encoding="utf-8")
+        test("产物：没声明落点就不建骨架（程序不写产物）", not report_file.exists(), str(report_file))
+        report_file.parent.mkdir(parents=True, exist_ok=True)
+        report_file.write_text("# 报告：试一次\n\n## 比对\n\n人写的内容\n\n## 结论\n\n人写的结论\n", encoding="utf-8")
+        gates = task_layer.open_task(root, data, "试一次").gates()
+        test("闸门项记在任务文件里，不进产物", any("创始人过目" in note for note in gates), str(gates))
+
         payload = flow_layer.load(flow.file)
         payload["steps"][2]["criteria"] = [{"executor": "rule", "description": "本任务报告里有结论", "file": "{{report}}", "contains": "## 结论"}]
         flow.file.write_text(flow_layer.dump(payload), encoding="utf-8")
         kept = report.task_step(root, data, "试一次", "结论", "写了结论")
-        test("产物可维护：程序只动自己两节，别的节留着", "人写的内容" in report_file.read_text(encoding="utf-8"), "人写的节被覆盖")
+        test("程序不碰产物：跑完一步产物原样", "人写的内容" in report_file.read_text(encoding="utf-8"), "人写的节被覆盖")
         test("占位：{{report}} 指到本任务的报告", all("{{" not in str(row) for row in kept.rows) and any("artifacts/report/试一次.md" in str(row) for row in kept.rows), str(kept.rows))
 
         report.task_journal(root, data, "试一次", "先串步骤，再执行。")
-        test("日志：叙事进 artifacts/journal", records.prose(task.artifact("journal")) != "")
+        test("日志：叙事进 artifacts/journal", task.artifact("journal").read_text(encoding="utf-8").strip() != "")
         test("列任务：报工作流与下一步", report.task_list(root, data).rows[0][1] == "试一条")
         test("工作流里没有的步骤就报错", not report.task_step(root, data, "试一次", "乱来", "", None) if False else not report.task_step(root, data, "试一次", "乱来").ok)
         test("数据分三家放", task.file.is_relative_to(data / "tasks") and flow.file.is_relative_to(data / "workflows") and task.artifacts_dir.is_relative_to(data / "artifacts"))
-        test("产物按类型进 artifacts/",
-             task.artifact("report").parent.name == "report" and task.artifact("report").name == "试一次.md" and task.artifact("journal").parent.name == "journal",
+        test("产物缺省落草稿区，声明了就按声明的落点",
+             task.artifact("report").name == "试一次.md" and task.artifact("journal").parent.name == "journal",
              f"{task.artifact('report')} / {task.artifact('journal')}")
 
 

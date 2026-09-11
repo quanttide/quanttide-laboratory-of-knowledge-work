@@ -42,7 +42,6 @@ from . import assets as assets_layer
 from . import task as task_layer
 from . import workflow as flow_layer
 from . import catalog as catalog_layer
-from . import records
 from . import report
 
 # ---- 浏览页：工作区层面的动作 ----

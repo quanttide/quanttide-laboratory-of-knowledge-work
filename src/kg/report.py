@@ -17,7 +17,6 @@ from . import task as task_layer
 from . import workflow as flow_layer
 from . import checks as checks_layer
 from . import material as material_layer
-from . import records
 
 MECHANICAL = ("核对", "结论", "说明")
 STEPS = ("material", "instruction", "review", "output", "decision", "finish", "history")

@@ -11,7 +11,7 @@
 
 任务是 YAML（跑哪条工作流、要什么），定义是 YAML（步骤、执行者、判据——见 workflow.py）；
 流水是 JSONL、报告与历史是 Markdown——那是记录与叙事，读物。
-走一步：执行者是 AI 的交给 pi 跑，然后程序自己判机械判据、把闸门项列给人，事实记进流水与报告。
+走一步：执行者是 AI 的交给 pi 跑，然后程序自己判机械判据、把闸门项记进任务文件，事实记进流水。
 """
 
 import json
@@ -25,7 +25,6 @@ import yaml
 
 from . import assets as assets_layer
 from . import checks as checks_layer
-from . import records
 from . import workflow as workflow_layer
 
 LOG = "log"
@@ -57,11 +56,29 @@ class Task:
     def artifacts_dir(self) -> Path:
         return self.data / "artifacts"
 
+    def products(self) -> dict:
+        """这次执行往哪写产物（任务是运行数据，产物与它没有从属关系）。"""
+        found = self.payload().get("products")
+        return found if isinstance(found, dict) else {}
+
     def artifact(self, kind: str) -> Path:
-        """流水就在任务文件里（{{log}} 指它），产物按类型进 artifacts/。"""
+        """流水就在任务文件里（{{log}} 指它）；产物路径先看声明，没声明就落草稿区。"""
         if kind == LOG:
             return self.file
+        written = str(self.products().get(kind, "")).strip()
+        if written:
+            path = Path(written)
+            return path if path.is_absolute() else self.root / path
         return self.artifacts_dir / kind / f"{self.name}{SUFFIX[kind]}"
+
+    def gates(self) -> list[str]:
+        """闸门项：等人拍板的事项，记在任务文件里。"""
+        return [str(item) for item in (self.payload().get("gates") or [])]
+
+    def set_gates(self, notes: list[str]) -> None:
+        payload = self.payload()
+        payload["gates"] = list(notes)
+        self.file.write_text(dump(payload), encoding="utf-8")
 
     def exists(self) -> bool:
         return self.file.is_file()
@@ -112,22 +129,21 @@ class Task:
         return str(path.relative_to(self.data)) if path.is_relative_to(self.data) else str(path)
 
 
-def create(root: Path, data: Path, name: str, workflow_name: str, workflows: Path | None = None) -> Task:
-    """起一件任务：写下指令（跑哪条工作流、要什么），备好产物三家。"""
+def create(root: Path, data: Path, name: str, workflow_name: str, workflows: Path | None = None, products: dict | None = None) -> Task:
+    """起一件任务：写下指令（跑哪条工作流、往哪写产物）。程序不写产物内容。"""
     task = Task(root, Path(data), name, workflows)
     task.file.parent.mkdir(parents=True, exist_ok=True)
-    task.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    for kind in (REPORT, JOURNAL):
-        task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
         payload = {"name": name, "start": now(), "workflow": workflow_name}
         payload.update(context(root, data, workflows))
         payload["log"] = []
+        payload["gates"] = []
+        payload["products"] = dict(products or {})
         task.file.write_text(dump(payload), encoding="utf-8")
-    if not task.artifact(REPORT).is_file():
-        task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
-    if not task.artifact(JOURNAL).is_file():
-        task.artifact(JOURNAL).write_text(records.journal_template(name), encoding="utf-8")
+    for kind in (REPORT, JOURNAL):
+        if str(task.products().get(kind, "")).strip() and not task.artifact(kind).is_file():
+            task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
+            task.artifact(kind).write_text(f"# {kind}：{name}\n", encoding="utf-8")
     return task
 
 
@@ -197,7 +213,7 @@ def prompt_for(task: Task, step: workflow_layer.Step) -> str:
 {criteria_text(step)}
 
 本任务的三样东西（报告与日志是产物，流水是执行痕迹）：
-  报告：{task.relative(task.artifact(REPORT))}（程序只维护「执行记录」与「闸门项」两节，其余节归你写）
+  产物：{task.relative(task.artifact(REPORT))}（程序不碰产物内容，谁写谁定）
   日志：{task.relative(task.artifact(JOURNAL))}
   流水：{task.relative(task.artifact(LOG))}（就在任务文件里）
 工作流里用 {{{{report}}}} / {{{{journal}}}} / {{{{log}}}} 指这三样；工作内容写进报告，别动程序那两节。
@@ -296,7 +312,7 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
         lines.append(f"  AI {'跑完了' if ran else '跑不动'}：{one_line(out) if out else '（没输出）'}")
         task.record(found.name, f"AI 执行：{one_line(out) if out else '（没输出）'}", ok=ran)
         if not ran:
-            write_report(task, [])
+            write_gates(task, [])
             lines.append("  （AI 没跑成，这一步不算过；修好再来）")
             return False, lines, []
     elif found.human and auto:
@@ -311,7 +327,7 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     detail = note.strip() or ("；".join(item.description for item, _, _ in results) if results else "做完")
     if not (auto and not found.human):
         task.record(step, detail, ok=ok)
-    write_report(task, gates + [note for note, verdict, _ in judged if verdict != "✓"])
+    write_gates(task, gates + [note for note, verdict, _ in judged if verdict != "✓"])
     lines.append(f"{'✓' if ok else '✗'} {step}：{detail}")
     lines += [f"  {'✓' if passed else '✗'} {item.description}（{spec}）" for item, passed, spec in results]
     lines += [f"  {verdict} {note}（{reason}）" for note, verdict, reason in judged]
@@ -321,22 +337,9 @@ def execute(task: Task, root: Path, step: str, note: str = "", auto: bool = Fals
     return ok, lines, rows + [(note, "闸门", "留给人拍板") for note in gates]
 
 
-SECTIONS = ("执行记录", "闸门项")   # 报告里归程序管的两节；别的节（人 / AI 写的产物）原样留着
-
-
-def write_report(task: Task, gates: list[str]) -> Path:
-    """报告：程序只动「执行记录」与「闸门项」两节，其余节（产物内容）保留。"""
-    path = task.artifact(REPORT)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    if not text.strip():
-        text = f"# 报告：{task.name}\n"
-    records = [f"- {'✓' if event.get('ok') else '✗'} {event['at']}　{event['step']}　{event['detail']}" for event in task.events()]
-    gates_lines = [f"- ⧗ {note}（留给人 / 待判）" for note in gates] or ["- （暂无）"]
-    text = replace_section(text, "执行记录", records)
-    text = replace_section(text, "闸门项", gates_lines)
-    path.write_text(text, encoding="utf-8")
-    return path
+def write_gates(task: Task, gates: list[str]) -> None:
+    """闸门项是任务的状态，记进任务文件；产物一个字都不碰。"""
+    task.set_gates(gates)
 
 
 def replace_section(text: str, title: str, body: list[str]) -> str:
@@ -352,7 +355,7 @@ def replace_section(text: str, title: str, body: list[str]) -> str:
 def narrate(task: Task, words: str) -> None:
     """日志收叙事：一段一段往下写。"""
     path = task.artifact(JOURNAL)
-    text = path.read_text(encoding="utf-8") if path.is_file() else records.journal_template(task.name)
+    text = path.read_text(encoding="utf-8") if path.is_file() else "# 日志：" + task.name + "\n"
     text = "\n".join(line for line in text.splitlines() if not (line.strip().startswith("（") and line.strip().endswith("）"))).rstrip()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"{text}\n\n{words.strip()}\n", encoding="utf-8")
