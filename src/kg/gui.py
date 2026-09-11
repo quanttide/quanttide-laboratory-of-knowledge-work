@@ -309,10 +309,11 @@ class Browser(QWidget):
 class Desk(QWidget):
     """台面：选一件任务（工作流的一次执行），看步骤状态，走一步。"""
 
-    def __init__(self, root: Path, data: Path):
+    def __init__(self, root: Path, data: Path, workflows: Path | None = None):
         super().__init__()
         self.root = root
         self.data = data
+        self.workflows = workflows
         self.task: task_layer.Task | None = None
         self._build()
         self.reload()
@@ -385,7 +386,7 @@ class Desk(QWidget):
 
     def reload(self) -> None:
         keep = self.task.name if self.task else ""
-        found = task_layer.listing(self.root, self.data)
+        found = task_layer.listing(self.root, self.data, self.workflows)
         self.picker.blockSignals(True)
         self.picker.clear()
         self.picker.addItems([item.name for item in found])
@@ -398,7 +399,7 @@ class Desk(QWidget):
         self.refresh()
 
     def _picked(self, index: int) -> None:
-        found = task_layer.listing(self.root, self.data)
+        found = task_layer.listing(self.root, self.data, self.workflows)
         self.task = found[index] if 0 <= index < len(found) else None
         self.refresh()
 
@@ -449,7 +450,7 @@ class Desk(QWidget):
         nxt = self.task.next_step()
         current = self.selected_step()
         auto = bool(nxt and current == nxt.name)  # 选中的是下一步：按执行者分派（默认 AI）
-        result = report.task_step(self.root, self.data, self.task.name, current, self.note.text().strip(), auto=auto)
+        result = report.task_step(self.root, self.data, self.task.name, current, self.note.text().strip(), auto=auto, workflows=self.workflows)
         self.note.clear()
         self.reload()
         bar.showMessage(result.lines[0] if result.lines else "")
@@ -460,7 +461,7 @@ class Desk(QWidget):
             return
         words, ok = QInputDialog.getMultiLineText(self, "日志", "这一次的来龙去脉（报告记事，日志叙事）")
         if ok and words.strip():
-            report.task_journal(self.root, self.data, self.task.name, words.strip())
+            report.task_journal(self.root, self.data, self.task.name, words.strip(), self.workflows)
             self.reload()
 
     def _export_workflow(self) -> None:
@@ -469,7 +470,7 @@ class Desk(QWidget):
         flow = self.task.workflow()
         path, _ = QFileDialog.getSaveFileName(self, "存到哪", str(self.root / f"{flow.name}.md"), "Markdown (*.md)")
         if path:
-            self.window().statusBar().showMessage(f"已导出：{report.workflow_export(self.data, flow.name, Path(path)).lines[0]}")
+            self.window().statusBar().showMessage(f"已导出：{report.workflow_export(self.data, flow.name, Path(path), self.workflows).lines[0]}")
 
     def _open_workflow(self) -> None:
         if self.task is None:
@@ -482,22 +483,23 @@ class Desk(QWidget):
         name, ok = QInputDialog.getText(self, "起一件任务", "这件任务叫什么")
         if not ok or not name.strip():
             return
-        flows = [flow.name for flow in flow_layer.listing(self.data)] if hasattr(flow_layer, "listing") else []
+        flows = [flow.name for flow in flow_layer.listing(self.data, self.workflows)] if hasattr(flow_layer, "listing") else []
         flow, ok = QInputDialog.getItem(self, "起一件任务", "跑哪条工作流", flows, 0, False)
         if not ok or not flow:
             return
-        self.task = task_layer.create(self.root, self.data, name.strip(), flow)
+        self.task = task_layer.create(self.root, self.data, name.strip(), flow, self.workflows)
         self.reload()
         self.window().statusBar().showMessage(f"起了：{self.task.file}")
 
 
 class Window(QMainWindow):
-    def __init__(self, root: Path | None = None, data: Path | None = None, runs: Path | None = None):
+    def __init__(self, root: Path | None = None, data: Path | None = None, runs: Path | None = None, workflows: Path | None = None):
         super().__init__()
         self.setWindowTitle("kg —— 量潮知识工作工具箱")
         self.resize(1040, 660)
         self.root = root or assets_layer.repo_root()
         self.data = data or flow_layer.lab_data()
+        self.workflows = workflows
 
         body = QWidget()
         self.setCentralWidget(body)
@@ -517,7 +519,7 @@ class Window(QMainWindow):
         top.addWidget(self.data_label)
         outer.addLayout(top)
 
-        self.desk = Desk(self.root, self.data)
+        self.desk = Desk(self.root, self.data, self.workflows)
         self.browser = Browser(self.root)
         tabs = QTabWidget()
         tabs.addTab(self.desk, "台面")
@@ -544,13 +546,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kg-gui", description="量潮知识工作工具箱的窗口版")
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
     parser.add_argument("--data", help="数据仓（默认本仓 data/——工作纪律：所有数据放这里）")
-    parser.add_argument("--runs", help="任务放哪（默认 <数据仓>/cases）")
+    parser.add_argument("--workflows", help="工作流目录（默认 <数据仓>/workflows/）")
     args = parser.parse_args(argv)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("kg")
     window = Window(
         Path(args.root).resolve() if args.root else None,
         Path(args.data).resolve() if args.data else None,
+        workflows=Path(args.workflows).resolve() if args.workflows else None,
             )
     window.show()
     return app.exec()

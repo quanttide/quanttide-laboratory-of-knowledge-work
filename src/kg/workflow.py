@@ -4,7 +4,7 @@
 
 定义要有**固定的意义**，所以是 YAML 而不是散文：字段名、字段取值、判据种类都由 schema 定死，不认识的字段直接报错。
 
-<数据仓>/workflows/<名字>.yaml
+<工作流目录>/<名字>.yaml（默认 <数据仓>/workflows/，可用 --workflows 另指）
 
   name: 课程档案比对
   description: 比对两边的档案
@@ -145,17 +145,27 @@ class Step:
         return self.of(HUMAN)
 
 
+def workflows_dir(data: Path, workflows: Path | None = None) -> Path:
+    """工作流目录：默认跟在数据仓里（<数据仓>/workflows/），可另指一处固定资产目录。
+
+    草稿与资产分开：定义（工作流）常是固定资产，放在正式仓里；一次执行留下的
+    草稿（任务、流水、产物）落在数据仓。工作区根只看数据盘在哪，路径照常写。
+    """
+    return Path(workflows) if workflows else Path(data) / "workflows"
+
+
 class Workflow:
     """过程的编排定义：一串步骤。"""
 
-    def __init__(self, data: Path, name: str, payload: dict | None = None):
+    def __init__(self, data: Path, name: str, payload: dict | None = None, workflows: Path | None = None):
         self.data = Path(data)
         self.name = name
         self.payload = payload or {}
+        self.workflows = workflows_dir(self.data, workflows)
 
     @property
     def file(self) -> Path:
-        return self.data / "workflows" / f"{self.name}.yaml"
+        return self.workflows / f"{self.name}.yaml"
 
     def exists(self) -> bool:
         return self.file.is_file()
@@ -180,7 +190,7 @@ class Workflow:
         return dump(self.payload)
 
 
-def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
+def create(data: Path, name: str, steps: list[str], note: str = "", workflows: Path | None = None) -> Workflow:
     """写一条工作流：步骤串联，每步给一份判据骨架（执行者默认 AI）。"""
     payload = {
         "name": name,
@@ -198,14 +208,14 @@ def create(data: Path, name: str, steps: list[str], note: str = "") -> Workflow:
             for step in steps
         ],
     }
-    flow = Workflow(Path(data), name, payload)
+    flow = Workflow(Path(data), name, payload, workflows)
     flow.file.parent.mkdir(parents=True, exist_ok=True)
     flow.file.write_text(flow.to_yaml(), encoding="utf-8")
     return flow
 
 
-def open_workflow(data: Path, name: str) -> Workflow:
-    flow = Workflow(Path(data), name)
+def open_workflow(data: Path, name: str, workflows: Path | None = None) -> Workflow:
+    flow = Workflow(Path(data), name, workflows=workflows)
     return flow.reload()
 
 
@@ -219,11 +229,11 @@ def export(flow: Workflow, target: Path) -> Path:
     return target
 
 
-def import_workflow(data: Path, source: Path, name: str = "") -> Workflow:
+def import_workflow(data: Path, source: Path, name: str = "", workflows: Path | None = None) -> Workflow:
     """把一份工作流导进来：先照 schema 验一遍，再起个名字落进 workflows/。"""
     payload = load(Path(source))
     chosen = (name or str(payload.get("name", "")).strip() or Path(source).stem).strip()
-    flow = Workflow(Path(data), chosen)
+    flow = Workflow(Path(data), chosen, workflows=workflows)
     if flow.exists():
         raise FileExistsError(f"已经有一条工作流叫「{chosen}」：{flow.file}（换名字用 --as）")
     payload["name"] = chosen
@@ -233,6 +243,6 @@ def import_workflow(data: Path, source: Path, name: str = "") -> Workflow:
     return flow
 
 
-def listing(data: Path) -> list[Workflow]:
-    base = Path(data) / "workflows"
-    return [open_workflow(data, path.stem) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
+def listing(data: Path, workflows: Path | None = None) -> list[Workflow]:
+    base = workflows_dir(Path(data), workflows)
+    return [open_workflow(data, path.stem, workflows) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []

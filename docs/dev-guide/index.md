@@ -20,7 +20,7 @@ src/kg/
 
 tests/test_kg.py       自带测试，39 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
 data/                  所有数据（工作纪律）：workflows/ 定义、tasks/（<任务>.yaml：start + workflow + log 流水）、artifacts/{report,journal}/ 产物（按任务名）
-kg / kg-gui            本目录下的启动器（不必安装）
+kg / kg-gui            本目录下的启动器（不必安装）——全局 --root（工作区）、--data（数据仓：任务与产物草稿）、--workflows（工作流目录，默认 <数据仓>/workflows/）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```
 

@@ -44,8 +44,9 @@ class Task:
     """一次执行：跑某条工作流，有自己的流水与产物。"""
 
     root: Path  # 工作区：读材料、核判据
-    data: Path  # 数据仓
+    data: Path  # 数据仓：草稿落在里面（任务、流水、产物）
     name: str
+    workflows: Path | None = None  # 工作流目录（默认 <数据仓>/workflows/）
 
     @property
     def file(self) -> Path:
@@ -81,7 +82,7 @@ class Task:
         return str(self.payload().get("workflow", "")).strip()
 
     def workflow(self) -> workflow_layer.Workflow:
-        return workflow_layer.open_workflow(self.data, self.workflow_name())
+        return workflow_layer.open_workflow(self.data, self.workflow_name(), self.workflows)
 
     def steps(self) -> list[workflow_layer.Step]:
         return self.workflow().steps()
@@ -110,9 +111,9 @@ class Task:
         return str(path.relative_to(self.data)) if path.is_relative_to(self.data) else str(path)
 
 
-def create(root: Path, data: Path, name: str, workflow_name: str) -> Task:
+def create(root: Path, data: Path, name: str, workflow_name: str, workflows: Path | None = None) -> Task:
     """起一件任务：写下指令（跑哪条工作流、要什么），备好产物三家。"""
-    task = Task(root, Path(data), name)
+    task = Task(root, Path(data), name, workflows)
     task.file.parent.mkdir(parents=True, exist_ok=True)
     task.artifacts_dir.mkdir(parents=True, exist_ok=True)
     for kind in (REPORT, JOURNAL):
@@ -126,13 +127,13 @@ def create(root: Path, data: Path, name: str, workflow_name: str) -> Task:
     return task
 
 
-def open_task(root: Path, data: Path, name: str) -> Task:
-    return Task(root, Path(data), name)
+def open_task(root: Path, data: Path, name: str, workflows: Path | None = None) -> Task:
+    return Task(root, Path(data), name, workflows)
 
 
-def listing(root: Path, data: Path) -> list[Task]:
+def listing(root: Path, data: Path, workflows: Path | None = None) -> list[Task]:
     base = Path(data) / "tasks"
-    return [Task(root, Path(data), path.stem) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
+    return [Task(root, Path(data), path.stem, workflows) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
 
 
 def prompt_for(task: Task, step: workflow_layer.Step) -> str:

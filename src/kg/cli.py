@@ -22,7 +22,7 @@
   kg task <名字> --next           走下一步：执行者是 AI 的交给 AI（pi -p）跑，然后跑判据、记账
   kg task <名字> --done <步骤> [--note 一句话]   人为地记一步（人自己做的）
   kg task <名字> --journal <一段话>   日志：写下这次工作的来龙去脉（叙事）
-  （数据默认落在实验室的 data/：工作流 workflows/、任务 tasks/、产物 artifacts/）
+  （数据默认落在实验室的 data/：任务 tasks/、产物 artifacts/；工作流默认跟着数据仓，可用 --workflows 另指一处固定资产目录）
 
 默认工作区从当前目录往上找（含 data/journal 的目录）；用 --root 指定别的第二大脑。
 """
@@ -73,35 +73,37 @@ def cmd_material(root: Path, args) -> int:
 
 def cmd_workflow(root: Path, args) -> int:
     data = Path(args.data)
+    flows = Path(args.workflows) if args.workflows else None
     if args.list:
-        return emit(report.workflow_list(data))
+        return emit(report.workflow_list(data, flows))
     if args.new:
         steps = [item.strip() for item in args.steps.split(",") if item.strip()]
-        return emit(report.workflow_new(data, args.name or "", steps, args.note))
+        return emit(report.workflow_new(data, args.name or "", steps, args.note, flows))
     if args.import_from:
-        return emit(report.workflow_import(data, Path(args.import_from), args.as_name))
+        return emit(report.workflow_import(data, Path(args.import_from), args.as_name, flows))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg workflow <名字>，或 --list / --new / --import"]))
     if args.export:
-        return emit(report.workflow_export(data, args.name, Path(args.export)))
-    return emit(report.workflow_show(data, args.name))
+        return emit(report.workflow_export(data, args.name, Path(args.export), flows))
+    return emit(report.workflow_show(data, args.name, flows))
 
 
 def cmd_task(root: Path, args) -> int:
     data = Path(args.data)
+    flows = Path(args.workflows) if args.workflows else None
     if args.list:
-        return emit(report.task_list(root, data))
+        return emit(report.task_list(root, data, flows))
     if args.new:
-        return emit(report.task_new(root, data, args.name or "", args.workflow))
+        return emit(report.task_new(root, data, args.name or "", args.workflow, flows))
     if not args.name:
         return emit(report.Result(ok=False, lines=["用法：kg task <名字>，或 kg task --list / --new <名字> --workflow <工作流>"]))
     if args.journal is not None:
-        return emit(report.task_journal(root, data, args.name, args.journal if isinstance(args.journal, str) else ""))
+        return emit(report.task_journal(root, data, args.name, args.journal if isinstance(args.journal, str) else "", flows))
     if args.next:
-        return emit(report.task_step(root, data, args.name, "", args.note, auto=True))
+        return emit(report.task_step(root, data, args.name, "", args.note, auto=True, workflows=flows))
     if args.done is not None:
-        return emit(report.task_step(root, data, args.name, args.done if isinstance(args.done, str) else "", args.note))
-    return emit(report.task_status(root, data, args.name))
+        return emit(report.task_step(root, data, args.name, args.done if isinstance(args.done, str) else "", args.note, workflows=flows))
+    return emit(report.task_status(root, data, args.name, flows))
 
 
 def cmd_gui(root: Path, args) -> int:
@@ -114,13 +116,17 @@ def cmd_gui(root: Path, args) -> int:
             "  2. 用发行版的包：sudo apt install python3-pyside6.qtwidgets"
         )
         return 2
-    return gui.main(["--root", str(root)])
+    argv = ["--root", str(root), "--data", str(Path(args.data))]
+    if args.workflows:
+        argv += ["--workflows", str(Path(args.workflows))]
+    return gui.main(argv)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kg", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
-    parser.add_argument("--data", default=str(flow_layer.lab_data()), help="数据仓（默认实验室 data/）")
+    parser.add_argument("--data", default=str(flow_layer.lab_data()), help="数据仓：任务与产物（草稿）落在这里，默认实验室 data/")
+    parser.add_argument("--workflows", help="工作流目录（默认跟在数据仓里：<数据仓>/workflows/；固定资产常另指一处）")
     sub = parser.add_subparsers(dest="action", required=True)
 
     find = sub.add_parser("find", help="按名找文档")

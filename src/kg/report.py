@@ -145,17 +145,17 @@ def material_payload(root: Path, paths: list[str] | None = None) -> dict:
 # ---- 记录：骨架与核对 ----
 
 
-def workflow_new(data: Path, name: str, steps: list[str], note: str = "") -> Result:
+def workflow_new(data: Path, name: str, steps: list[str], note: str = "", workflows: Path | None = None) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先给工作流起个名字"])
     if not steps:
         return Result(ok=False, lines=["至少给一个步骤：--steps 甲,乙,丙"])
-    flow = flow_layer.create(data, name.strip(), steps, note)
-    return workflow_show(data, name.strip()).with_first(f"写下工作流：{short(data, flow.file)}")
+    flow = flow_layer.create(data, name.strip(), steps, note, workflows)
+    return workflow_show(data, name.strip(), workflows).with_first(f"写下工作流：{short(data, flow.file)}")
 
 
-def workflow_show(data: Path, name: str) -> Result:
-    flow = flow_layer.open_workflow(data, name)
+def workflow_show(data: Path, name: str, workflows: Path | None = None) -> Result:
+    flow = flow_layer.open_workflow(data, name, workflows)
     if not flow.exists():
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
     result = Result(columns=("步骤", "谁执行", "怎么算完"), lines=[f"工作流：{flow.name}（{short(data, flow.file)}）"])
@@ -166,30 +166,30 @@ def workflow_show(data: Path, name: str) -> Result:
     return result
 
 
-def workflow_export(data: Path, name: str, target: Path) -> Result:
-    flow = flow_layer.open_workflow(data, name)
+def workflow_export(data: Path, name: str, target: Path, workflows: Path | None = None) -> Result:
+    flow = flow_layer.open_workflow(data, name, workflows)
     if not flow.exists():
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}"])
     saved = flow_layer.export(flow, target)
-    result = workflow_show(data, name)
+    result = workflow_show(data, name, workflows)
     result.lines.insert(0, f"已导出：{saved}（步骤 {len(flow.steps())} 个，原样带走）")
     return result
 
 
-def workflow_import(data: Path, source: Path, name: str = "") -> Result:
+def workflow_import(data: Path, source: Path, name: str = "", workflows: Path | None = None) -> Result:
     if not Path(source).is_file():
         return Result(ok=False, lines=[f"没有这份文件：{source}"])
     try:
-        flow = flow_layer.import_workflow(data, source, name)
+        flow = flow_layer.import_workflow(data, source, name, workflows)
     except (ValueError, FileExistsError) as error:
         return Result(ok=False, lines=[str(error)])
-    result = workflow_show(data, flow.name)
+    result = workflow_show(data, flow.name, workflows)
     result.lines.insert(0, f"已导入：{short(data, flow.file)}（步骤 {len(flow.steps())} 个）")
     return result
 
 
-def workflow_list(data: Path) -> Result:
-    found = flow_layer.listing(data)
+def workflow_list(data: Path, workflows: Path | None = None) -> Result:
+    found = flow_layer.listing(data, workflows)
     result = Result(columns=("工作流", "步骤", "位置"), lines=[])
     for flow in found:
         result.rows.append((flow.name, "、".join(step.name for step in flow.steps()), short(data, flow.file)))
@@ -199,22 +199,22 @@ def workflow_list(data: Path) -> Result:
     return result
 
 
-def task_new(root: Path, data: Path, name: str, workflow: str) -> Result:
+def task_new(root: Path, data: Path, name: str, workflow: str, workflows: Path | None = None) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先给这件任务起个名字"])
-    flow = flow_layer.open_workflow(data, workflow)
+    flow = flow_layer.open_workflow(data, workflow, workflows)
     if not flow.exists():
         return Result(ok=False, lines=[f"没有这条工作流：{short(data, flow.file)}（kg workflow --list 看有哪些）"])
-    task = task_layer.create(root, data, name.strip(), workflow.strip())
-    result = task_status(root, data, name.strip())
+    task = task_layer.create(root, data, name.strip(), workflow.strip(), workflows)
+    result = task_status(root, data, name.strip(), workflows)
     result.lines.insert(0, f"起了：{short(data, task.file)}")
     return result
 
 
-def task_status(root: Path, data: Path, name: str) -> Result:
+def task_status(root: Path, data: Path, name: str, workflows: Path | None = None) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先选一件任务（kg task --list 看有哪些）"])
-    task = task_layer.open_task(root, data, name)
+    task = task_layer.open_task(root, data, name, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     done = task.done()
@@ -236,8 +236,8 @@ def task_status(root: Path, data: Path, name: str) -> Result:
     return result
 
 
-def task_list(root: Path, data: Path) -> Result:
-    found = task_layer.listing(root, data)
+def task_list(root: Path, data: Path, workflows: Path | None = None) -> Result:
+    found = task_layer.listing(root, data, workflows)
     result = Result(columns=("任务", "工作流", "下一步"))
     for task in found:
         step = task.next_step()
@@ -248,9 +248,9 @@ def task_list(root: Path, data: Path) -> Result:
     return result
 
 
-def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "", auto: bool = False) -> Result:
+def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "", auto: bool = False, workflows: Path | None = None) -> Result:
     """走一步：能让 AI 跑的交给 AI（auto），然后跑判据、记账。"""
-    task = task_layer.open_task(root, data, name)
+    task = task_layer.open_task(root, data, name, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not step.strip():
@@ -266,8 +266,8 @@ def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "",
     return result
 
 
-def task_journal(root: Path, data: Path, name: str, words: str) -> Result:
-    task = task_layer.open_task(root, data, name)
+def task_journal(root: Path, data: Path, name: str, words: str, workflows: Path | None = None) -> Result:
+    task = task_layer.open_task(root, data, name, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not words.strip():

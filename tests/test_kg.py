@@ -284,11 +284,31 @@ def gui_smoke(real: Path) -> None:
     del app
 
 
+def split_dirs(real: Path) -> None:
+    """定义与草稿分家：工作流放在固定资产目录，任务与产物落在数据仓。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = fake_repo(Path(tmp) / "split")
+        (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
+        data = Path(tmp) / "draft"
+        flows = Path(tmp) / "assets" / "workflows"
+        flows.mkdir(parents=True)
+
+        flow_layer.create(data, "试一条", ["一步"], "", flows)
+        test("分家：工作流写进指定目录", (flows / "试一条.yaml").is_file() and not (data / "workflows").exists(), str(flows))
+        test("分家：列表读的是指定目录", [f.name for f in flow_layer.listing(data, flows)] == ["试一条"])
+
+        task = task_layer.create(root, data, "试一次", "试一条", flows)
+        test("分家：任务落在数据仓", task.file == data / "tasks" / "试一次.yaml", str(task.file))
+        test("分家：任务认得另一处的工作流", [s.name for s in task.steps()] == ["一步"])
+        test("分家：产物仍按类型进数据仓", task.artifact("report") == data / "artifacts" / "report" / "试一次.md", str(task.artifact("report")))
+
+
 def main() -> int:
     real = assets_layer.repo_root()
     workspace(real)
     judges(real)
     flow_and_task(real)
+    split_dirs(real)
     carry(real)
     links(real)
     gui_smoke(real)
