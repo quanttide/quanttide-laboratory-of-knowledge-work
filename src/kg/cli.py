@@ -18,7 +18,7 @@
 任务（工作流的一次执行实例）
   kg task --list                 有哪些任务、跑哪条工作流、下一步
   kg task --new <名字> --workflow <工作流>            起一件任务（要什么由工作流说）
-  kg task <名字>                 看步骤状态与流水
+  kg task <名字>                 看步骤状态与流水（工作区与工作流目录用任务里记的，不写参数）
   kg task <名字> --next           走下一步：执行者是 AI 的交给 AI（pi -p）跑，然后跑判据、记账
   kg task <名字> --done <步骤> [--note 一句话]   人为地记一步（人自己做的）
   kg task <名字> --journal <一段话>   日志：写下这次工作的来龙去脉（叙事）
@@ -90,6 +90,7 @@ def cmd_workflow(root: Path, args) -> int:
 
 def cmd_task(root: Path, args) -> int:
     data = Path(args.data)
+    root = Path(args.root).resolve() if args.root else None  # 不写就用任务里记的工作区
     flows = Path(args.workflows) if args.workflows else None
     if args.list:
         return emit(report.task_list(root, data, flows))
@@ -124,7 +125,7 @@ def cmd_gui(root: Path, args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kg", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
+    parser.add_argument("--root", help="工作区根（默认：任务里记的，其次从当前目录往上找）")
     parser.add_argument("--data", default=str(flow_layer.lab_data()), help="数据仓：任务与产物（草稿）落在这里，默认实验室 data/")
     parser.add_argument("--workflows", help="工作流目录（默认跟在数据仓里：<数据仓>/workflows/；固定资产常另指一处）")
     sub = parser.add_subparsers(dest="action", required=True)

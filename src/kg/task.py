@@ -3,7 +3,7 @@
 规格：任务（Task）＝过程的一次执行实例；它跑的是某条工作流（workflow.py）。
 
 <数据仓>/
-├── tasks/<任务>.yaml           这一次执行：跑哪条工作流（要什么由工作流的 description 说）
+├── tasks/<任务>.yaml           这一次执行：跑哪条工作流 + 这次自带的运行上下文（root / data / workflows）
 └── artifacts/                  产物按类型分家，按任务名命名
     ├── report/<任务>.md        报告（事件）：执行记录 + 闸门项，机器写
     ├── history/<任务>.md       历史（叙事）：人写
@@ -23,6 +23,7 @@ from pathlib import Path
 
 import yaml
 
+from . import assets as assets_layer
 from . import checks as checks_layer
 from . import records
 from . import workflow as workflow_layer
@@ -119,7 +120,10 @@ def create(root: Path, data: Path, name: str, workflow_name: str, workflows: Pat
     for kind in (REPORT, JOURNAL):
         task.artifact(kind).parent.mkdir(parents=True, exist_ok=True)
     if not task.file.is_file():
-        task.file.write_text(dump({"name": name, "start": now(), "workflow": workflow_name, "log": []}), encoding="utf-8")
+        payload = {"name": name, "start": now(), "workflow": workflow_name}
+        payload.update(context(root, data, workflows))
+        payload["log"] = []
+        task.file.write_text(dump(payload), encoding="utf-8")
     if not task.artifact(REPORT).is_file():
         task.artifact(REPORT).write_text(records.report_template(name), encoding="utf-8")
     if not task.artifact(JOURNAL).is_file():
@@ -131,9 +135,48 @@ def open_task(root: Path, data: Path, name: str, workflows: Path | None = None) 
     return Task(root, Path(data), name, workflows)
 
 
-def listing(root: Path, data: Path, workflows: Path | None = None) -> list[Task]:
+def context(root: Path, data: Path, workflows: Path | None = None) -> dict:
+    """这次执行自带的运行上下文：工作区按绝对记，草稿仓与工作流目录能相对就相对。
+
+    上下文随任务落盘（任务文件里 root / data / workflows 三个字段），不靠全局配置，
+    也不靠「你现在在哪」——同一件任务在图里看得见、能 diff、到别处也解释得出来。
+    """
+    def as_written(path: Path | None) -> str:
+        if path is None:
+            return ""
+        path = Path(path)
+        return str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
+
+    return {"root": str(Path(root)), "data": as_written(Path(data)), "workflows": as_written(workflows)}
+
+
+def reopen(data: Path, name: str, root: Path | None = None, workflows: Path | None = None) -> Task:
+    """开一件任务：命令行给了就用命令行的，没给就用任务里记的。
+
+    数据仓是「任务在哪」的指针（省了就得靠全局状态去找它），工作区与工作流目录
+    记在任务里，所以可以省。
+    """
+    data = Path(data)
+    record = Task(Path("."), data, name).payload()
+    recorded_root = str(record.get("root", "")).strip()
+    if root is None:
+        root = Path(recorded_root).expanduser() if recorded_root else None
+    if root is None:
+        root = assets_layer.repo_root()
+    if workflows is None:
+        recorded_flows = str(record.get("workflows", "")).strip()
+        if recorded_flows:
+            candidate = Path(recorded_flows)
+            workflows = candidate if candidate.is_absolute() else Path(root) / candidate
+    return Task(Path(root), data, name, workflows)
+
+
+def listing(root: Path | None, data: Path, workflows: Path | None = None) -> list[Task]:
+    """按数据仓里的任务文件列：每件都用它自己记的上下文（根另给则另给）。"""
     base = Path(data) / "tasks"
-    return [Task(root, Path(data), path.stem, workflows) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
+    if not base.is_dir():
+        return []
+    return [reopen(data, path.stem, root, workflows) for path in sorted(base.glob("*.yaml"))]
 
 
 def prompt_for(task: Task, step: workflow_layer.Step) -> str:

@@ -164,7 +164,8 @@ def flow_and_task(real: Path) -> None:
         test("任务：状态里看得到工作流与指令文件",
              any("工作流：试一条" in line for line in started.lines) and any("指令：" in line for line in started.lines),
              str(started.lines[:4]))
-        test("任务文件 = name + start + workflow + 流水", set(task.payload()) == {"name", "start", "workflow", "log"}, str(task.payload()))
+        test("任务文件 = name + start + workflow + 运行上下文 + 流水",
+             set(task.payload()) == {"name", "start", "workflow", "root", "data", "workflows", "log"}, str(task.payload()))
         test("开工记成 start 字段（不是流水里的一步）", task.start() != "" and "开工" not in [e["step"] for e in task.events()], str(task.payload()["start"]))
         test("流水记在任务文件里（不再另开 jsonl）", task.artifact("log") == task.file, str(task.events()[:1]))
         test("任务：起时只记 start，不记流水", task.start() != "" and task.events() == [])
@@ -284,6 +285,30 @@ def gui_smoke(real: Path) -> None:
     del app
 
 
+def recorded_context(real: Path) -> None:
+    """运行上下文随任务落盘：不写 --root / --workflows 也开得起来，且不靠全局配置。"""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = fake_repo(Path(tmp) / "ctx")
+        (root / "data" / "journal" / "README.md").write_text("# 日志\n", encoding="utf-8")
+        data = root / "data" / "context" / "qtcloud-work"
+        flows = root / "data" / "profile" / "iGuo" / "workflows"
+        flows.mkdir(parents=True)
+        flow_layer.create(data, "试一条", ["一步"], "", flows)
+        task_layer.create(root, data, "试一次", "试一条", flows)
+
+        record = task_layer.open_task(root, data, "试一次").payload()
+        test("上下文：任务记下工作区（绝对）", record["root"] == str(root), record["root"])
+        test("上下文：草稿仓与工作流目录按工作区相对记",
+             record["data"] == "data/context/qtcloud-work" and record["workflows"] == "data/profile/iGuo/workflows", str(record))
+
+        plain = task_layer.reopen(data, "试一次")
+        test("上下文：不给 --workflows 也认得另一处的工作流", [s.name for s in plain.steps()] == ["一步"] and plain.workflows == flows, str(plain.workflows))
+        test("上下文：不给 --root 也回得到工作区", plain.root == root, str(plain.root))
+
+        given = task_layer.reopen(data, "试一次", root, None)
+        test("上下文：命令行给了就优先", given.root == root and given.workflows == flows, str(given.root))
+
+
 def split_dirs(real: Path) -> None:
     """定义与草稿分家：工作流放在固定资产目录，任务与产物落在数据仓。"""
     with tempfile.TemporaryDirectory() as tmp:
@@ -309,6 +334,7 @@ def main() -> int:
     judges(real)
     flow_and_task(real)
     split_dirs(real)
+    recorded_context(real)
     carry(real)
     links(real)
     gui_smoke(real)

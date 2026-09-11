@@ -159,7 +159,8 @@ data/artifacts/journal/<任务>.md  日志（叙事）：这次工作的来龙�
 - **能用 AI 跑的都用 AI**：步骤默认 `executor: agent`；人只留在 `executor: human` 的判据上（拍板）；
 - **智能体不能审自己那一步**——同一步的执行者与判据若是同一个智能体，等于自评自过（现在实现里是同一个 pi，流水里标了「AI 审查（同一模型）」，将来要换成另一个执行者）；
 
-- **定义与草稿分家**：工作流是固定资产，放在正式仓（如 `data/profile/iGuo/workflows/`）；一次执行留下的草稿（任务、流水、产物）落数据仓（如 `data/context/qtcloud-work/`）。分开指定：`--workflows <工作流目录> --data <数据仓>`；
+- **定义与草稿分家**：工作流是固定资产，放在正式仓（如 `data/profile/iGuo/workflows/`）；一次执行留下的草稿（任务、流水、产物）落数据仓（如 `data/context/qtcloud-work/`）。起任务时把 `--workflows` 指过去；
+- **运行上下文随任务走**：工作区根、草稿仓、工作流目录记在任务文件里（`root` / `data` / `workflows`），此后 `kg task <名字>` 只写数据仓（「任务在哪」的指针），工作区与工作流目录不写就用记着的——不靠全局配置，也不靠「你现在在哪」；
 - **判据要能判过**：程序每走完一步都会把自己的执行记录写回任务与报告，仓库必然带脏；别拿「仓库干净」当判据，要看具体对象（例如子模块指针：`git -C ../.. status --porcelain --ignore-submodules=dirty -- <路径>`）；
 - **数据全落 `data/`**（workflows / tasks / artifacts 三家），不写实验室外面；
 - **定义用 YAML、记录用 Markdown**：编排与判据是定义（schema 定死），报告与历史是记录（读得顺）；

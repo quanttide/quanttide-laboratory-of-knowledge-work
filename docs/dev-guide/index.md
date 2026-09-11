@@ -15,11 +15,11 @@ src/kg/
 ├── material.py  材料：类型 / 内容 / 来源 / 时间，阶段由位置承担
 ├── records.py   记录的段位与骨架：报告（执行记录 + 闸门项）、日志（叙事）
 ├── workflow.py  工作流（YAML）：严格 schema（name / description / steps；步骤 name / description / executor / criteria；判据 executor: rule|agent|human）
-├── task.py      任务（YAML）：工作流的一次执行（状态、走一步、流水、报告、历史）
+├── task.py      任务（YAML）：工作流的一次执行（运行上下文、走一步、流水、报告、日志）
 └── __main__.py  python3 -m kg
 
 tests/test_kg.py       自带测试，39 项（装 PySide6 窗口模块则多 7 项界面冒烟），不依赖 pytest
-data/                  所有数据（工作纪律）：workflows/ 定义、tasks/（<任务>.yaml：start + workflow + log 流水）、artifacts/{report,journal}/ 产物（按任务名）
+data/                  所有数据（工作纪律）：workflows/ 定义、tasks/（<任务>.yaml：start + workflow + 运行上下文 root/data/workflows + log 流水）、artifacts/{report,journal}/ 产物（按任务名）
 kg / kg-gui            本目录下的启动器（不必安装）——全局 --root（工作区）、--data（数据仓：任务与产物草稿）、--workflows（工作流目录，默认 <数据仓>/workflows/）
 pyproject.toml         打包：装上就是 kg 与 kg-gui 命令
 ```

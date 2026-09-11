@@ -211,10 +211,10 @@ def task_new(root: Path, data: Path, name: str, workflow: str, workflows: Path |
     return result
 
 
-def task_status(root: Path, data: Path, name: str, workflows: Path | None = None) -> Result:
+def task_status(root: Path | None, data: Path, name: str, workflows: Path | None = None) -> Result:
     if not name.strip():
         return Result(ok=False, lines=["请先选一件任务（kg task --list 看有哪些）"])
-    task = task_layer.open_task(root, data, name, workflows)
+    task = task_layer.reopen(data, name, root, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     done = task.done()
@@ -236,7 +236,7 @@ def task_status(root: Path, data: Path, name: str, workflows: Path | None = None
     return result
 
 
-def task_list(root: Path, data: Path, workflows: Path | None = None) -> Result:
+def task_list(root: Path | None, data: Path, workflows: Path | None = None) -> Result:
     found = task_layer.listing(root, data, workflows)
     result = Result(columns=("任务", "工作流", "下一步"))
     for task in found:
@@ -248,9 +248,9 @@ def task_list(root: Path, data: Path, workflows: Path | None = None) -> Result:
     return result
 
 
-def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "", auto: bool = False, workflows: Path | None = None) -> Result:
+def task_step(root: Path | None, data: Path, name: str, step: str = "", note: str = "", auto: bool = False, workflows: Path | None = None) -> Result:
     """走一步：能让 AI 跑的交给 AI（auto），然后跑判据、记账。"""
-    task = task_layer.open_task(root, data, name, workflows)
+    task = task_layer.reopen(data, name, root, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not step.strip():
@@ -266,8 +266,8 @@ def task_step(root: Path, data: Path, name: str, step: str = "", note: str = "",
     return result
 
 
-def task_journal(root: Path, data: Path, name: str, words: str, workflows: Path | None = None) -> Result:
-    task = task_layer.open_task(root, data, name, workflows)
+def task_journal(root: Path | None, data: Path, name: str, words: str, workflows: Path | None = None) -> Result:
+    task = task_layer.reopen(data, name, root, workflows)
     if not task.exists():
         return Result(ok=False, lines=[f"没有这件任务：{short(data, task.file)}"])
     if not words.strip():
