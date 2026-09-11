@@ -181,6 +181,6 @@ kg task 课程档案比对 --done 结论 --note "四条处置建议，闸门待�
 
 ## 真事二例
 
-2026-09-11 把「语境条目进材料库」这条日常流程写成工作流（定义放在个人档案 `data/profile/iGuo/workflows/context-to-profile.yaml`，程序仍是实验室这个）。五步：`pull`（拉语境、条目清单进报告）→ `classify`（逐条认分类，拿不准的留给人）→ `coarsen`（粗加工写进 `materials/<分类>/index.md`）→ `move-out`（从语境删掉已迁出的，日期文件留空）→ `commit`（档案仓、语境仓各自提交推送，再回工作区更新指针）。
+2026-09-11 把「语境条目进材料库」这条日常流程写成工作流（定义放在平台草稿区 `data/context/qtcloud-work/workflows/context-to-profile.yaml`，程序仍是实验室这个）。五步：`pull`（拉语境、条目清单进报告）→ `classify`（逐条认分类，拿不准的留给人）→ `coarsen`（粗加工写进 `materials/<分类>/index.md`）→ `move-out`（从语境删掉已迁出的，日期文件留空）→ `commit`（档案仓、语境仓各自提交推送，再回工作区更新指针）。
 
 实跑一遍：智能体自己发现四条里三条已在材料里，只补了缺的那条；两条闸门（分类裁决、创始人点头）挂进报告。末条判据当场判不过——原先写的是「工作区里两个指针都已记录」，而程序的记账总在提交之后落笔，仓库永远带脏；改成看指针（`--ignore-submodules=dirty`）才判得动。判据是给自己立的，立完要真跑一遍。
