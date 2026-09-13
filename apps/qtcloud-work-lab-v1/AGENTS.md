@@ -1,10 +1,10 @@
 # AGENTS —— 实验室工作纪律
 
-本仓是量潮知识工作实验室（`quanttide-laboratory-of-knowledge-work`）。在这儿干活的 AI 与人都按本文办。
+本 app 是量潮知识工作实验室 v1（`qtcloud-work-lab-v1`）。在这儿干活的 AI 与人都按本文办。
 
 ## 数据：全部放 `data/`
 
-**所有数据放本仓的 `data/` 下，不许写到实验室外面**——工作区的 `data/`、规格、手册、案例都算外面。
+**所有数据放本 app 的 `data/` 下，不许写到实验室外面**——工作区的 `data/`、规格、手册、案例都算外面。
 
 ```text
 data/
@@ -23,7 +23,7 @@ data/
 
 **判据与步骤都用同一个 `executor` 答「谁承担」**：步骤上 `agent|human`（谁做），判据上 `rule|agent|human`（谁判）——`rule` 由规则引擎按字段判（`path` / `absent` / `file`+`contains` / `run`）、`agent` 由智能体照 `description` 的判准审、`human` 留给人。判据是字段，不是一行小语法；不认识的字段直接报错，不许默默忽略。
 
-程序默认就写在这里（`kg --data`，缺省即本仓 `data/`）；要写别处必须显式指路。
+程序默认就写在这里（`kg --data`，缺省即本 app `data/`）；要写别处必须显式指路。
 
 ## 禁止过滤
 

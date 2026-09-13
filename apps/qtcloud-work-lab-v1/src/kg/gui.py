@@ -544,7 +544,7 @@ class Window(QMainWindow):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="kg-gui", description="量潮知识工作工具箱的窗口版")
     parser.add_argument("--root", help="工作区根（默认从当前目录往上找）")
-    parser.add_argument("--data", help="数据仓（默认本仓 data/——工作纪律：所有数据放这里）")
+    parser.add_argument("--data", help="数据仓（默认本 app data/——工作纪律：所有数据放这里）")
     parser.add_argument("--workflows", help="工作流目录（默认 <数据仓>/workflows/）")
     args = parser.parse_args(argv)
     app = QApplication.instance() or QApplication(sys.argv[:1])

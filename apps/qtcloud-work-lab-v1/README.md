@@ -1,6 +1,6 @@
-# quanttide-laboratory-of-knowledge-work
+# qtcloud-work-lab-v1
 
-量潮知识工作实验室——知识工作实验与原型。
+量潮知识工作实验室 v1——知识工作实验与原型。
 
 ## 一个程序：kg
 
