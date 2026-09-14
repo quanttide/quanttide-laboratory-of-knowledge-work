@@ -27,12 +27,15 @@ uv pip install -e .                    # 或装成命令：kg
 | `kg order done <名字> <步骤>` | 人记一笔；带 `human` 判据的闸门站，放行也走这里 |
 | `kg order journal <名字> <一段话>` | 日志：叙事落产物，不动流水 |
 | `kg order delete <名字>` | 删一张白纸——流水非空即拒，账本不销户 |
+| `kg catalog [--json]` / `kg audit [--make]` | 看目录 / 审计工作区（资产表有而工作区无、工作区有而资产表无，`--make` 补建） |
+| `kg find <名字> [--show]` | 按名找文档——认文件名与中文标题 |
+| `kg material [路径…] [--json]` | 看材料——类型、内容、来源、时间，阶段由位置承担 |
 
-工作区不进命令行：从当前目录往上找 `workspace.yaml`，找不到就用本 app 的 `data/`；`--root` 可另指一处。
+位置不进模型，由启动参数装载：`--root` 工作区根（判据基准与工作区级扫描面，缺省从当前目录往上找 `data/journal`）、`--data` 账本仓（工单与产物，缺省本 app 的 `data/`）、`--workflows` 定义目录（缺省 `<账本仓>/workflows/`，固定资产常另指一处）。给了 `--root` 就自成一区。
 
 ## 目录
 
-- `src/kg/` 程序：workspace（工作区身份与落点）、workflow（工作流与工作步骤）、workorder（工单与工作记录）、checks（判据）、execute（走一步：智能体执行与人记一笔）、events（领域事件）、artifacts（产物）、actions（动作层）、cli（命令行入口）
+- `src/kg/` 程序：workspace（装载：根 / 账本仓 / 定义目录与工作区身份）、workflow（工作流与工作步骤）、workorder（工单与工作记录）、checks（判据）、execute（走一步：智能体执行与人记一笔）、events（领域事件）、artifacts（产物）、assets / catalog / material（工作区级：资产表、目录、材料）、actions（动作层）、cli（命令行入口）
 - `data/` 所有数据（工作纪律，见 `AGENTS.md`）
 - `tests/` 自带测试：`python3 tests/test_kg.py`，不依赖 pytest
 - `docs/` 说明：设计、开发计划、用法

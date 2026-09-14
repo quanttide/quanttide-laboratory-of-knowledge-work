@@ -1,4 +1,4 @@
-"""入口：一个程序，两个动词——工作流与工单。
+"""入口：一个程序，六个动作——工作流、工单，加工作区的看与核。
 
 工作流（过程的定义：一串有序的步骤，每步写明谁做、怎么算完）
   kg workflow create <名字> --steps 甲,乙,丙 [--description 一句话]   写一条工作流
@@ -17,15 +17,22 @@
   kg order journal <名字> <一段话>       日志：叙事落产物
   kg order delete <名字>               删一张白纸：流水非空即拒
 
-v1 的写法也认：`workflow --new` 同 `workflow create`，`order <名字> --next` 同 `order next <名字`。
-工作区不进命令行：从当前目录往上找 workspace.yaml，找不到就用本 app 的 data/；--root 可另指。
+工作区（实验室自留：规格未规定，按 v1 原样保留）
+  kg catalog [--json 文件]             看目录——按资产表清点工作区里实际有什么
+  kg audit [--json 文件] [--make]      审计——资产表有而工作区无、工作区有而资产表无；--make 补建
+  kg find <名字> [--show]              按名找文档——认文件名与中文标题
+  kg material [路径…] [--json 文件]     看材料——类型、内容、来源、时间，阶段由位置承担
+
+位置不进模型，由启动参数装载：--root 工作区根（判据基准与扫描面，缺省往上找 data/journal）、
+--data 账本仓（工单与产物，缺省本 app 的 data/）、--workflows 定义目录（缺省 <账本仓>/workflows/）。
+v1 的旗标写法也认：`order <名字> --next` 同 `order next <名字>`。
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from . import actions, workspace as workspace_layer
+from . import actions, catalog as catalog_layer, workspace as workspace_layer
 
 WORKFLOW_VERBS = ("create", "show", "list", "check", "export", "import")
 ORDER_VERBS = ("create", "show", "list", "next", "done", "journal", "delete")
@@ -89,9 +96,39 @@ def cmd_order(workspace, args) -> int:
     return emit(actions.order_show(workspace, rest[0] if rest else ""))
 
 
+def cmd_catalog(workspace, args) -> int:
+    if args.json:
+        payload = actions.catalog_payload(workspace)
+        catalog_layer.write_json(Path(args.json), payload)
+        print(f"已导出：{args.json}（{payload['count']} 条）")
+        return 0
+    return emit(actions.catalog(workspace))
+
+
+def cmd_find(workspace, args) -> int:
+    return emit(actions.find(workspace, args.name, args.show))
+
+
+def cmd_audit(workspace, args) -> int:
+    if args.json:
+        catalog_layer.write_json(Path(args.json), actions.audit_payload(workspace))
+    return emit(actions.audit(workspace, args.make))
+
+
+def cmd_material(workspace, args) -> int:
+    if args.json:
+        payload = actions.material_payload(workspace, args.paths)
+        catalog_layer.write_json(Path(args.json), payload)
+        print(f"已导出：{args.json}（{payload['count']} 条）")
+        return 0
+    return emit(actions.material(workspace, args.paths))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kg", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", help="工作区根（默认：从当前目录往上找 workspace.yaml，找不到用本 app 的 data/）")
+    parser.add_argument("--root", help="工作区根（判据基准与工作区级扫描面；缺省从当前目录往上找 data/journal）")
+    parser.add_argument("--data", help="账本仓：工单与产物（草稿）落在这里，缺省本 app 的 data/")
+    parser.add_argument("--workflows", help="定义目录（缺省 <账本仓>/workflows/；固定资产常另指一处）")
     sub = parser.add_subparsers(dest="action", required=True)
 
     flow = sub.add_parser("workflow", help="工作流：一串有序的步骤")
@@ -117,15 +154,37 @@ def build_parser() -> argparse.ArgumentParser:
     order.add_argument("--journal", nargs="?", const=True, metavar="一段话", help="日志：叙事落产物")
     order.add_argument("--note", default="", metavar="一句话", help="记一句这一步做了什么")
     order.add_argument("--json", action="store_true", help="list 出机读一份")
+
+    listing = sub.add_parser("catalog", help="看目录（工作区级）")
+    listing.add_argument("--json", metavar="文件")
+
+    audit = sub.add_parser("audit", help="审计工作区")
+    audit.add_argument("--json", metavar="文件")
+    audit.add_argument("--make", action="store_true", help="补建缺的资产格子")
+
+    finding = sub.add_parser("find", help="按名找文档")
+    finding.add_argument("name", metavar="名字")
+    finding.add_argument("--show", action="store_true", help="连正文一起看")
+
+    material = sub.add_parser("material", help="看材料")
+    material.add_argument("paths", nargs="*", metavar="路径")
+    material.add_argument("--json", metavar="文件")
     return parser
 
 
-HANDLERS = {"workflow": cmd_workflow, "order": cmd_order}
+HANDLERS = {
+    "workflow": cmd_workflow,
+    "order": cmd_order,
+    "catalog": cmd_catalog,
+    "audit": cmd_audit,
+    "find": cmd_find,
+    "material": cmd_material,
+}
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    workspace = workspace_layer.resolve(Path(args.root) if args.root else None)
+    workspace = workspace_layer.resolve(args.root, args.data, args.workflows)
     return HANDLERS[args.action](workspace, args)
 
 

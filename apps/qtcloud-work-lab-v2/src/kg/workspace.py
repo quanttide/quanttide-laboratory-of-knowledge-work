@@ -1,10 +1,17 @@
-"""工作区：工作的边界——身份与落点。
+"""工作区：工作的边界——根、账本仓与落点。
 
-规格：工作区（Workspace）只认内容、不认位置（见 specification/place/workspace.md）。
-本 app 里，工作区就是装着 `workspace.yaml` 的那个目录：定义（workflows/）、账本
-（workorders/）、产物（artifacts/）与事件（events.jsonl）都落在它下面，不写它外面。
+规格：工作区（Workspace）只认内容、不认位置——工件在物理上从哪来、落在哪，由平台在
+装载时决定；同一个工作区，资源可以来自多处、任意组合（见 specification/place/workspace.md）。
+
+本 app 的装载分三处：
+
+- 工作区根（root）：判据路径的基准、`run` 判据的工作目录、工作区级动作（目录 / 审计 /
+  材料 / 找文档）扫描的面；默认从当前目录往上找到含 `data/journal` 的第二大脑；
+- 账本仓（data）：工作区身份、工单、产物与事件落在这里；默认本 app 的 `data/`；
+- 定义目录（workflows）：工作流定义所在；默认 `<账本仓>/workflows/`，可另指一处固定资产目录。
 
 身份缺则首跑生成：`id` / `name` / `title` / `description` / `created_at` / `updated_at`。
+位置不进模型：这些都不写进工单文件，只由启动参数定。
 """
 
 from pathlib import Path
@@ -30,27 +37,36 @@ def dump(payload: dict) -> str:
 
 
 def lab_data() -> Path:
-    """实验室自己的工作区：本 app 的 `data/`（工作纪律：数据全落这里）。"""
+    """账本仓缺省：本 app 的 `data/`（工作纪律：数据全落这里）。"""
     return Path(__file__).resolve().parents[2] / "data"
 
 
-def resolve(where=None) -> "Workspace":
-    """工作区不进命令行：从当前目录往上找 `workspace.yaml`，找不到就用实验室 `data/`。
-
-    首跑生成：不存在的目录也要开成工作区（身份与目录在此落成）。
-    """
-    if where:
-        return Workspace(Path(where).expanduser()).ensure()
-    here = Path.cwd().resolve()
+def repo_root(start: Path | None = None) -> Path:
+    """工作区根缺省：从起点往上找，直到看见数据层（含 `data/journal` 的目录）。"""
+    here = (start or Path.cwd()).resolve()
     for candidate in (here, *here.parents):
-        if (candidate / IDENTITY).is_file():
-            return Workspace(candidate).ensure()
-    return Workspace(lab_data()).ensure()
+        if (candidate / "data" / "journal").is_dir():
+            return candidate
+    return here
 
 
-def default_identity(root: Path) -> dict:
-    """首跑生成的身份：名字取目录名（`data/` 取上一层），标题同名字。"""
-    name = root.name if root.name != "data" else root.parent.name
+def resolve(root=None, data=None, workflows=None) -> "Workspace":
+    """装载工作区：位置由启动参数定，缺省按上面的规矩找。
+
+    给了 `--root` 就自成一区（账本仓默认跟着它）；不给则扫面取第二大脑、账本仓取本 app `data/`。
+    """
+    base = Path(root).expanduser() if root else repo_root()
+    if data:
+        home = Path(data).expanduser()
+    elif root:
+        home = base
+    else:
+        home = lab_data()
+    return Workspace(base, home, Path(workflows).expanduser() if workflows else None)
+
+
+def default_identity(data: Path) -> dict:
+    name = data.name if data.name != "data" else data.parent.name
     stamp = clock.now()
     return {
         "id": ids.new_id(),
@@ -63,40 +79,43 @@ def default_identity(root: Path) -> dict:
 
 
 class Workspace:
-    """装着 `workspace.yaml` 的那个目录。"""
+    """一次装载：根、账本仓、定义目录。"""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, data: Path | None = None, workflows: Path | None = None):
         self.root = Path(root)
+        self.data = Path(data) if data else self.root
+        self._workflows = Path(workflows) if workflows else None
 
     @property
     def identity_file(self) -> Path:
-        return self.root / IDENTITY
+        return self.data / IDENTITY
 
     @property
     def workflows_dir(self) -> Path:
-        return self.root / WORKFLOWS
+        return self._workflows or self.data / WORKFLOWS
 
     @property
     def workorders_dir(self) -> Path:
-        return self.root / WORKORDERS
+        return self.data / WORKORDERS
 
     @property
     def artifacts_dir(self) -> Path:
-        return self.root / ARTIFACTS
+        return self.data / ARTIFACTS
 
     @property
     def events_file(self) -> Path:
-        return self.root / EVENTS
+        return self.data / EVENTS
 
     def ensure(self) -> "Workspace":
-        self.workflows_dir.mkdir(parents=True, exist_ok=True)
+        """写动作前把账本仓开出来：身份缺则首跑生成。只读动作不碰盘。"""
         self.workorders_dir.mkdir(parents=True, exist_ok=True)
+        if self._workflows is None:
+            self.workflows_dir.mkdir(parents=True, exist_ok=True)
         if not self.identity_file.is_file():
-            self.identity_file.write_text(dump(default_identity(self.root)), encoding="utf-8")
+            self.identity_file.write_text(dump(default_identity(self.data)), encoding="utf-8")
         return self
 
     def identity(self) -> dict:
-        """工作区身份：缺则首跑生成，读不通当场报错。"""
         self.ensure()
         try:
             payload = yaml.safe_load(self.identity_file.read_text(encoding="utf-8"))

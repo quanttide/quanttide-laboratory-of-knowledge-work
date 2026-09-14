@@ -16,6 +16,7 @@ sys.path.insert(0, str(LAB / "src"))
 
 from kg import actions, artifacts, cli, events, execute  # noqa: E402
 from kg import ids as ids_layer  # noqa: E402
+from kg import material as material_layer  # noqa: E402
 from kg import workorder, workspace as workspace_layer  # noqa: E402
 from kg import workflow as flow  # noqa: E402
 
@@ -271,10 +272,51 @@ def command_line(tmp: Path) -> None:
         test("命令行：order journal", cli.main([*root, "order", "journal", "试一次", "一段叙事。"]) == 0)
         test("命令行：order delete 有账即拒", cli.main([*root, "order", "delete", "试一次"]) == 1)
         test("命令行：没有的工单报错不崩", cli.main([*root, "order", "show", "没有这一单"]) == 1)
+        test("命令行：catalog 走得通", cli.main([*root, "catalog"]) == 0)
+        test("命令行：find 无此名报错", cli.main([*root, "find", "绝无此名"]) == 1)
+
+
+def fake_brain(tmp: Path) -> Path:
+    """现搭一个最小的工作区根（第二大脑的样子）：日志与档案里各放一篇。"""
+    root = tmp / "brain"
+    (root / "data" / "journal" / "iGuo").mkdir(parents=True)
+    (root / "data" / "journal" / "2026-09-10.md").write_text("# 今天\n\n记一笔。\n", encoding="utf-8")
+    (root / "data" / "profile" / "iGuo" / "materials" / "work").mkdir(parents=True)
+    (root / "data" / "profile" / "iGuo" / "materials" / "work" / "index.md").write_text("# 知识工作\n\n**规矩**：落到实处。\n", encoding="utf-8")
+    return root
+
+
+def workspace_actions(tmp: Path) -> None:
+    """工作区级动作（目录 / 找文档 / 审计 / 材料）：扫的是工作区根，只读时不动盘。"""
+    with tempfile.TemporaryDirectory() as inner:
+        root = fake_brain(Path(inner))
+        lab = Path(inner) / "lab"
+        ws = workspace_layer.Workspace(root, lab)
+
+        found = actions.catalog(ws)
+        test("目录：按资产表清点", any("journal" in line for line in found.lines) and any("profile" in line for line in found.lines))
+        hit = actions.find(ws, "知识工作")
+        test("找文档：认篇内标题", hit.ok and any("index.md" in line for line in hit.lines), str(hit.lines))
+        test("找文档：查无此名就说不认识", not actions.find(ws, "绝无此名").ok)
+
+        items = dict(material_layer.materials(root))
+        journal = items["data/journal/2026-09-10.md"]
+        profile = items["data/profile/iGuo/materials/work/index.md"]
+        test("材料：四字段各就各位", journal.type == "md" and journal.content == "记一笔。" and journal.source == "journal/2026-09-10.md", f"{journal.source}")
+        test("材料：时间取文件名里的日期", journal.created_at == "2026-09-10", journal.created_at)
+        test("材料：阶段由位置承担", journal.stage == "原始" and profile.stage == "材料")
+
+        test("只读动作不在根上乱建（身份 / 定义 / 账本都不写）", not (root / "workspace.yaml").exists() and not (root / "workflows").exists() and not lab.exists())
+
+        report = actions.audit(ws)
+        test("审计：缺的格子报出来", not report.ok and any("缺资产" in line for line in report.lines), str(report.lines[:3]))
+        actions.audit(ws, make=True)
+        test("审计：--make 补建格子", (root / "data" / "history" / "README.md").is_file())
+        test("审计：独立仓库那三格不凭空建", not (root / "packages").exists())
 
 
 def main() -> int:
-    for group in (identity, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line):
+    for group in (identity, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions):
         with tempfile.TemporaryDirectory() as tmp:
             group(Path(tmp))
 

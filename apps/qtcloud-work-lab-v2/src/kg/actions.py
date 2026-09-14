@@ -1,4 +1,4 @@
-"""动作：命令行要做的每一件事，命令行与将来的窗口共用的一层。
+"""动作：命令行要做的每一件事。
 
 每个动作返回一个 Result——`ok` 通不通，`lines` 是要打印的话，`columns` / `rows` 是同一
 份表格。算法只在这里写一遍。模型会抛错（schema 不合、撞名、有账不销），这里兜住、转成
@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import artifacts, events, execute, workorder
+from . import artifacts, assets as assets_layer, catalog as catalog_layer, events, execute, material as material_layer, workorder
 from . import workflow as flow
 
 
@@ -240,3 +240,101 @@ def _state_line(order: workorder.Order) -> str:
     if step is None:
         return f"走完了：{len(order.steps())} 个步骤都过了。"
     return f"进度：{workorder.progress(order)}　下一步：{step['name']}"
+
+
+# ---- 工作区（实验室自留：规格未规定，按 v1 原样保留）----
+
+
+def catalog(workspace) -> Result:
+    """看目录：按资产表清点工作区里实际有什么。"""
+    found = catalog_layer.build(workspace.root)
+    result = Result(columns=("种类", "路径"))
+    for entry in found.entries:
+        rel = short(workspace, entry.path)
+        result.lines.append(f"[{entry.kind}] {rel}")
+        result.rows.append((entry.kind, rel))
+    return result
+
+
+def catalog_payload(workspace) -> dict:
+    found = catalog_layer.build(workspace.root)
+    return {
+        "root": workspace.root.name,
+        "count": len(found.entries),
+        "entries": [{"kind": entry.kind, "path": short(workspace, entry.path), "names": sorted(entry.names)} for entry in found.entries],
+    }
+
+
+def audit(workspace, make: bool = False) -> Result:
+    """审计工作区：资产表有而工作区无、工作区有而资产表无；make 为真则补建缺的格子。"""
+    root = workspace.root
+    missing = assets_layer.missing(root)
+    unregistered = catalog_layer.build(root).unregistered(root)
+    made = assets_layer.make(root, missing) if make else []
+    missing = assets_layer.missing(root)
+    unregistered = catalog_layer.build(root).unregistered(root)
+    ok = not (missing or unregistered)
+    result = Result(
+        ok=ok,
+        columns=("问题", "说明"),
+        rows=[("缺资产", f"{asset.kind}（{asset.name}）") for asset in missing] + [("未登记", short(workspace, path)) for path in unregistered],
+    )
+    result.lines = [f"补建：{short(workspace, path)}" for path in made]
+    result.lines += [f"{kind}：{what}" for kind, what in result.rows]
+    if ok:
+        result.lines.append("审计通过：二十格齐备，无未登记目录。")
+    elif unregistered and not missing:
+        result.lines.append("未登记的目录要么属于某一格（改资产表），要么不该在这儿。")
+    return result
+
+
+def audit_payload(workspace) -> dict:
+    root = workspace.root
+    missing = assets_layer.missing(root)
+    unregistered = catalog_layer.build(root).unregistered(root)
+    return {
+        "root": root.name,
+        "result": "通过" if not (missing or unregistered) else "有问题",
+        "missing": [{"kind": asset.kind, "name": asset.name} for asset in missing],
+        "unregistered": [short(workspace, path) for path in unregistered],
+    }
+
+
+def find(workspace, name: str, show: bool = False) -> Result:
+    """按名找文档：认文件名与中文标题。"""
+    if not name.strip():
+        return fail("请填要找的名字")
+    matches = catalog_layer.build(workspace.root).find(name)
+    if not matches:
+        return fail(f"未找到：{name}")
+    result = Result(columns=("种类", "路径"))
+    for entry in matches:
+        rel = short(workspace, entry.path)
+        result.lines.append(f"[{entry.kind}] {rel}")
+        result.rows.append((entry.kind, rel))
+        if show:
+            if entry.path.is_dir():
+                result.lines.append("  （目录）" + "、".join(sorted(path.name for path in entry.path.iterdir() if not path.name.startswith("."))))
+            else:
+                result.lines.append(entry.path.read_text(encoding="utf-8").rstrip())
+    return result
+
+
+def material(workspace, paths: list[str] | None = None) -> Result:
+    """看材料：类型、内容、来源、时间，阶段由位置承担。"""
+    found = material_layer.materials(workspace.root, paths)
+    result = Result(columns=("材料", "类型", "阶段", "时间", "来源"))
+    for rel, item in found:
+        result.rows.append((rel, item.type, item.stage, item.created_at or "（缺）", item.source))
+        result.lines.append(f"{rel:52} {item.type:5} {item.stage:5} {item.created_at or '（缺）':11} {item.source}")
+        if item.missing:
+            result.ok = False
+            result.lines.append(f"缺字段：{rel}——{'、'.join(item.missing)}")
+    if result.ok:
+        result.lines.append("阶段由资产位置承担：日志是原始，其余是材料。")
+    return result
+
+
+def material_payload(workspace, paths: list[str] | None = None) -> dict:
+    found = material_layer.materials(workspace.root, paths)
+    return {"count": len(found), "materials": [{"path": rel, **vars(item)} for rel, item in found]}
