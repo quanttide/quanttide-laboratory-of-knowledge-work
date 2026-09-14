@@ -243,6 +243,7 @@ def walking(tmp: Path) -> None:
 
             gated = actions.order_next(ws, "试一次")
             test("走一步：有闸门就等人放行", gated.ok and "等人放行" in "".join(gated.lines), str(gated.lines))
+            test("走一步：提示词带上流水（执行者与复查者看得见前面）", any("流水（前几笔" in prompt and "产物在" in prompt for prompt in calls), str(calls[-1:])[:100])
             test("走一步：闸门没放行就不落成功流水", workorder.progress(workorder.read(ws, "试一次")) == "1/2")
 
             released = actions.order_done(ws, "试一次", "闸门", "点头了")

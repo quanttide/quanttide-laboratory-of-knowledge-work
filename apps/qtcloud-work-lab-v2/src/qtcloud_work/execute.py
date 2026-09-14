@@ -49,6 +49,17 @@ def criteria_text(order: workorder.Order, step: dict) -> str:
     return "\n".join(lines) or "（这一步没有判据）"
 
 
+def previous_records(order: workorder.Order, limit: int = 8) -> str:
+    """前几笔流水：执行者与复查者得看得见前面发生了什么、人放了什么行。"""
+    records = order.records[-limit:]
+    if not records:
+        return "（还没有流水）"
+    return "\n".join(
+        f"- 第 {record['seq']} 笔（{record['created_at']}）{record['step']}：{'过' if record['is_succeeded'] else '没过'}——{record['description']}"
+        for record in records
+    )
+
+
 def prompt_for(order: workorder.Order, step: dict) -> str:
     """交给智能体的那一段话：这一步做什么、判据是什么、落点在哪。"""
     steps = "、".join(item["name"] for item in order.steps())
@@ -64,6 +75,9 @@ def prompt_for(order: workorder.Order, step: dict) -> str:
 
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
 {criteria_text(order, step)}
+
+流水（前几笔，含人的放行与裁决——照它办）：
+{previous_records(order)}
 
 规矩：数据只写工作区；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """
@@ -89,6 +103,9 @@ def judge_prompt(order: workorder.Order, step: dict, criteria: list[dict]) -> st
 工作区：{order.workspace.root}
 要审的东西：这一步的产物与相关文件都在工作区内
 这一步做什么：{step['description']}
+
+流水（前几笔，含人的放行与裁决——照它判）：
+{previous_records(order)}
 
 判准（逐条判）：
 {listed}
