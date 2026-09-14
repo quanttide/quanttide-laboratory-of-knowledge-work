@@ -1,25 +1,31 @@
-"""工作区：工作的边界——根、账本仓与落点。
+"""工作区：工作的边界——根、账本与落点。
 
 规格：工作区（Workspace）只认内容、不认位置——工件在物理上从哪来、落在哪，由平台在
 装载时决定；同一个工作区，资源可以来自多处、任意组合（见 specification/place/workspace.md）。
 
-本 app 的装载分三处：
+本 app 的装载分两处：
 
-- 工作区根（root）：判据路径的基准、`run` 判据的工作目录、工作区级动作（目录 / 审计 /
-  材料 / 找文档）扫描的面；默认从当前目录往上找到含 `data/journal` 的第二大脑；
-- 账本仓（data）：工作区身份、工单、产物与事件落在这里；默认本 app 的 `data/`；
-- 定义目录（workflows）：工作流定义所在；默认 `<账本仓>/workflows/`，可另指一处固定资产目录。
+- **工作区根（root）**：判据路径的基准、`run` 判据的工作目录、工作区级动作（目录 / 审计 /
+  材料 / 找文档）扫描的面；就是人放材料、定义与产物的地方，默认从当前目录往上找到含
+  `data/journal` 的第二大脑。
+- **账本（data）**：CLI 自己维护的东西——工作区身份、工单、产物、事件落在这里；默认是
+  CLI 自己的数据目录 `$XDG_DATA_HOME/qtcloud-work/workspaces/<工作区键>/`（见下），
+  指到仓库就等于把它入版控（`--data`）。
 
-身份缺则首跑生成：`id` / `name` / `title` / `description` / `created_at` / `updated_at`。
+工作区键由工作区根的路径派生（可读名 + 短码）：账本是「这台机器上的这个工作区」的账。
+工作区身份缺则首跑生成：`id` / `name` / `title` / `description` / `created_at` / `updated_at`。
 位置不进模型：这些都不写进工单文件，只由启动参数定。
 """
 
+import hashlib
+import os
 from pathlib import Path
 
 import yaml
 
 from . import clock, ids
 
+APP = "qtcloud-work"
 IDENTITY = "workspace.yaml"
 WORKFLOWS = "workflows"
 WORKORDERS = "workorders"
@@ -36,9 +42,26 @@ def dump(payload: dict) -> str:
     return yaml.safe_dump(payload, allow_unicode=True, sort_keys=False, width=200)
 
 
-def lab_data() -> Path:
-    """账本仓缺省：本 app 的 `data/`（工作纪律：数据全落这里）。"""
-    return Path(__file__).resolve().parents[2] / "data"
+def xdg_data_home() -> Path:
+    """XDG 数据目录：`$XDG_DATA_HOME`，缺省 `~/.local/share`。"""
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+
+
+def store() -> Path:
+    """CLI 自己的数据目录：账本都落在这里。"""
+    return xdg_data_home() / APP
+
+
+def workspace_key(root: Path) -> str:
+    """工作区键：由工作区根的路径派生——可读名加短码。"""
+    resolved = Path(root).resolve()
+    digest = hashlib.sha1(str(resolved).encode("utf-8")).hexdigest()[:8]
+    return f"{resolved.name}-{digest}"
+
+
+def account(root: Path) -> Path:
+    """这个工作区的账本目录。"""
+    return store() / "workspaces" / workspace_key(root)
 
 
 def repo_root(start: Path | None = None) -> Path:
@@ -51,35 +74,19 @@ def repo_root(start: Path | None = None) -> Path:
 
 
 def resolve(root=None, data=None, workflows=None) -> "Workspace":
-    """装载工作区：位置由启动参数定，缺省按上面的规矩找。
-
-    给了 `--root` 就自成一区（账本仓默认跟着它）；不给则扫面取第二大脑、账本仓取本 app `data/`。
-    """
+    """装载工作区：位置由启动参数定，缺省按上面的规矩找。"""
     base = Path(root).expanduser() if root else repo_root()
-    if data:
-        home = Path(data).expanduser()
-    elif root:
-        home = base
-    else:
-        home = lab_data()
+    home = Path(data).expanduser() if data else account(base)
     return Workspace(base, home, Path(workflows).expanduser() if workflows else None)
 
 
-def default_identity(data: Path) -> dict:
-    name = data.name if data.name != "data" else data.parent.name
+def default_identity(name: str) -> dict:
     stamp = clock.now()
-    return {
-        "id": ids.new_id(),
-        "name": name,
-        "title": name,
-        "description": "",
-        "created_at": stamp,
-        "updated_at": stamp,
-    }
+    return {"id": ids.new_id(), "name": name, "title": name, "description": "", "created_at": stamp, "updated_at": stamp}
 
 
 class Workspace:
-    """一次装载：根、账本仓、定义目录。"""
+    """一次装载：根与账本。"""
 
     def __init__(self, root: Path, data: Path | None = None, workflows: Path | None = None):
         self.root = Path(root)
@@ -107,12 +114,12 @@ class Workspace:
         return self.data / EVENTS
 
     def ensure(self) -> "Workspace":
-        """写动作前把账本仓开出来：身份缺则首跑生成。只读动作不碰盘。"""
+        """写动作前把账本开出来：身份缺则首跑生成。只读动作不碰盘。"""
         self.workorders_dir.mkdir(parents=True, exist_ok=True)
         if self._workflows is None:
             self.workflows_dir.mkdir(parents=True, exist_ok=True)
         if not self.identity_file.is_file():
-            self.identity_file.write_text(dump(default_identity(self.data)), encoding="utf-8")
+            self.identity_file.write_text(dump(default_identity(self.root.name)), encoding="utf-8")
         return self
 
     def identity(self) -> dict:

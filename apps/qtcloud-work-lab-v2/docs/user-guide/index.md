@@ -4,7 +4,7 @@
 
 ## 功能对表（v1 → v2）
 
-v1 的每个动作在 v2 都有归属——沿用、收编或明说退役；规格没规定的动作标记「实验室自留」。下表程序名暂以 `kg` 称（见开发计划·决策点「程序名」）。表中 v1 动作取自 v1 的 README 与代码：`new-instruction` / `audit-instruction` / `new-report` / `audit-report` 四条 README 列过而代码里没有，前两条的意图由 `workflow create` / `workflow check` 承担，后两条退役。
+v1 的每个动作在 v2 都有归属——沿用、收编或明说退役；规格没规定的动作标记「实验室自留」。程序名 `qtcloud-work`（v1 叫 `kg`）。表中 v1 动作取自 v1 的 README 与代码：`new-instruction` / `audit-instruction` / `new-report` / `audit-report` 四条 README 列过而代码里没有，前两条的意图由 `workflow create` / `workflow check` 承担，后两条退役。
 
 | v1 动作 | 规格归属 | v2 动作 | 变化 |
 | :-- | :-- | :-- | :-- |
@@ -29,16 +29,18 @@ v1 的每个动作在 v2 都有归属——沿用、收编或明说退役；规�
 
 ## 数据
 
-数据全落工作区（默认本 app `data/`），不写实验室外（工作纪律，见 `AGENTS.md`）：
+**账本归 CLI，内容归工作区**：CLI 自己维护的东西落 CLI 自己的数据目录（XDG），不写进工作区；工作区根是人自己的地方，只由人放东西。
 
 ```text
-workspace.yaml                 工作区身份：id / name / title / description / created_at / updated_at，缺则首跑生成
-workflows/<工作流>.yaml        定义：name、description 与 steps（每步 name / description / executor / criteria）；凭证按名派生，不落文件
-workorders/<工单>.yaml         账本：封面（id / name / description / workflow_id / created_at）加内页（records 流水）
-artifacts/<类别>/<工单名>.md    产物按类别分家，按工单名命名
-events.jsonl                   领域事件：WorkflowCreated / WorkOrderCreated / WorkRecorded，一条一行，只增不改
+$XDG_DATA_HOME/qtcloud-work/           # 缺省 ~/.local/share/qtcloud-work
+└── workspaces/<工作区键>/
+    ├── workspace.yaml                 工作区身份：id / name / title / description / created_at / updated_at，缺则首跑生成
+    ├── workflows/<工作流>.yaml        定义：name、description 与 steps；凭证按名派生，不落文件
+    ├── workorders/<工单>.yaml         工单：封面加流水（records 内嵌，不另落盘）
+    ├── artifacts/<类别>/<工单名>.md    产物按类别分家，按工单名命名
+    └── events.jsonl                   领域事件：WorkflowCreated / WorkOrderCreated / WorkRecorded，一条一行，只增不改
 ```
 
-工作区不进命令行：从当前目录往上找 `workspace.yaml`，找不到就用本 app 的 `data/`；`--root` 可另指。
+`<工作区键>` 由工作区根的路径派生（可读名 + 短码）。位置不进模型，由启动参数装载：`--root` 工作区根（判据基准与扫描面）、`--data` 账本（缺省上面那处，指到仓库就等于入版控）、`--workflows` 定义目录（缺省 `<账本>/workflows/`，固定资产常另指一处）。
 
-工单的流水（`records`）内嵌在工单里，不另落盘。产物落点由工作区按名字算（算法实验室自定，见[设计](../index.md)·行为差）。
+产物落点由工作区按名字算（算法实验室自定，见[设计](../index.md)·行为差）。

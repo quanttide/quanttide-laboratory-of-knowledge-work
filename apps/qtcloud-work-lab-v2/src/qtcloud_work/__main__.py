@@ -1,4 +1,4 @@
-"""python3 -m kg 的入口。"""
+"""python3 -m qtcloud_work 的入口。"""
 
 import sys
 

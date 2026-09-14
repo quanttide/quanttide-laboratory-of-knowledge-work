@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = ["PyYAML>=6"]
 
 [project.scripts]
-kg = "kg.cli:main"
+qtcloud-work = "qtcloud_work.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

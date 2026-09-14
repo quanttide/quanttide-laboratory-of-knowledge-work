@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """程序自带测试：不用额外依赖，干净检出上直接跑。
 
-  python3 tests/test_kg.py
+  python3 tests/test_qtcloud_work.py
 
-夹具全在临时目录里现搭：不碰真工作区，也不碰网络的。
+夹具全在临时目录里现搭：不碰真工作区，也不碰网络的。账本一律指到临时目录，不碰真 XDG。
 """
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -14,11 +15,11 @@ from pathlib import Path
 LAB = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(LAB / "src"))
 
-from kg import actions, artifacts, cli, events, execute  # noqa: E402
-from kg import ids as ids_layer  # noqa: E402
-from kg import material as material_layer  # noqa: E402
-from kg import workorder, workspace as workspace_layer  # noqa: E402
-from kg import workflow as flow  # noqa: E402
+from qtcloud_work import actions, artifacts, cli, events, execute  # noqa: E402
+from qtcloud_work import ids as ids_layer  # noqa: E402
+from qtcloud_work import material as material_layer  # noqa: E402
+from qtcloud_work import workorder, workspace as workspace_layer  # noqa: E402
+from qtcloud_work import workflow as flow  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
 
@@ -276,6 +277,7 @@ def command_line(tmp: Path) -> None:
     """命令行：走一遍真动作；头一个词是动词或旧写法都认。"""
     with tempfile.TemporaryDirectory() as inner:
         ws = Path(inner) / "ws"
+        ws.mkdir(parents=True)  # 工作区根是人自己的地方：得先存在（账本才归 CLI 建）
         root = ["--root", str(ws)]
         test("命令行：workflow create", cli.main([*root, "workflow", "create", "试一条", "--steps", "甲,乙", "--description", "看看"]) == 0)
         test("命令行：workflow --new 也认（旧写法）", cli.main([*root, "workflow", "--new", "另一条", "--steps", "起"]) == 0)
@@ -285,7 +287,7 @@ def command_line(tmp: Path) -> None:
         test("命令行：order list --json", cli.main([*root, "order", "list", "--json"]) == 0)
         test("命令行：order show", cli.main([*root, "order", "show", "试一次"]) == 0)
 
-        target = workspace_layer.Workspace(ws)
+        target = workspace_layer.resolve(root=ws)  # 与命令行同一处装载（账本落 CLI 自己的数据目录）
         payload = flow.read(target, "试一条")
         payload["steps"][0]["criteria"] = [{"executor": "rule", "description": "工作区在", "path": "."}]
         payload["steps"][1]["criteria"] = [{"executor": "human", "description": "创始人点头"}]
@@ -344,10 +346,25 @@ def workspace_actions(tmp: Path) -> None:
         test("审计：独立仓库那三格不凭空建", not (root / "packages").exists())
 
 
+def account_dir(tmp: Path) -> None:
+    """账本缺省：落在 CLI 自己的数据目录（XDG），按工作区根派生一个键。"""
+    with tempfile.TemporaryDirectory() as inner:
+        root = Path(inner) / "brain"
+        (root / "data" / "journal").mkdir(parents=True)
+        ws = workspace_layer.resolve(root=root)
+        test("账本：缺省落 CLI 自己的数据目录", ws.data == workspace_layer.store() / "workspaces" / workspace_layer.workspace_key(root), str(ws.data))
+        test("账本：数据目录按 XDG 兜底", workspace_layer.store().parent == workspace_layer.xdg_data_home(), str(workspace_layer.store()))
+        test("账本：同一工作区两次装载指同一处", workspace_layer.resolve(root=root).data == ws.data)
+        test("账本：换个工作区就换一处", workspace_layer.resolve(root=Path(inner) / "elsewhere").data != ws.data)
+        test("账本：--data 指到哪就落哪（入版控的逃生口）", workspace_layer.resolve(root=root, data=Path(inner) / "repo").data == Path(inner) / "repo")
+
+
 def main() -> int:
-    for group in (identity, credentials, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions):
-        with tempfile.TemporaryDirectory() as tmp:
-            group(Path(tmp))
+    with tempfile.TemporaryDirectory() as xdg:
+        os.environ["XDG_DATA_HOME"] = xdg  # 测试一律不碰真 XDG
+        for group in (identity, credentials, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions, account_dir):
+            with tempfile.TemporaryDirectory() as tmp:
+                group(Path(tmp))
 
     for name, ok, detail in RESULTS:
         print(f"{'✓' if ok else '✗'} {name}" + (f"——{detail}" if detail and not ok else ""))

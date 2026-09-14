@@ -1,6 +1,6 @@
 # qtcloud-work-lab-v2：按规格重写
 
-实验室 v2 按规格重写，功能对表 v1。规格是准绳（`docs/specification/process/` 的工作流、工作步骤、工单、工作记录四篇），v1 是功能基线（`apps/qtcloud-work-lab-v1`，`kg` 全部动作）。先对表，再动工。
+实验室 v2 按规格重写，功能对表 v1。规格是准绳（`docs/specification/process/` 的工作流、工作步骤、工单、工作记录四篇），v1 是功能基线（`apps/qtcloud-work-lab-v1`，v1 程序 `kg` 的全部动作）。先对表，再动工。
 
 ## 对表原则
 

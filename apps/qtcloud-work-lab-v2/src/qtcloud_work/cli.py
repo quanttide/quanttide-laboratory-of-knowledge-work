@@ -1,30 +1,31 @@
 """入口：一个程序，六个动作——工作流、工单，加工作区的看与核。
 
 工作流（过程的定义：一串有序的步骤，每步写明谁做、怎么算完）
-  kg workflow create <名字> --steps 甲,乙,丙 [--description 一句话]   写一条工作流
-  kg workflow show <名字>              看这条工作流的步骤与判据
-  kg workflow list                     有哪些工作流
-  kg workflow check <名字>             定义核对：路径在不在区内、小节有没有判据覆盖
-  kg workflow export <名字> <文件>      存成一份可带走的文件
-  kg workflow import <文件> [--as 名字]  导进来用（先照 schema 验，重名挡）
+  qtcloud-work workflow create <名字> --steps 甲,乙,丙 [--description 一句话]   写一条工作流
+  qtcloud-work workflow show <名字>              看这条工作流的步骤与判据
+  qtcloud-work workflow list                     有哪些工作流
+  qtcloud-work workflow check <名字>             定义核对：路径在不在区内、小节有没有判据覆盖
+  qtcloud-work workflow export <名字> <文件>      存成一份可带走的文件
+  qtcloud-work workflow import <文件> [--as 名字]  导进来用（先照 schema 验，重名挡）
 
 工单（行程的账本：封面落笔即封，流水只增不改）
-  kg order create <名字> --workflow <工作流> [--description 一句话]   开工单
-  kg order show <名字>                 读全貌：封面加全量流水，进度照流水推导
-  kg order list [--workflow <工作流>] [--json]   列本工作区的工单
-  kg order next <名字> [--note 一句话]   走下一步：智能体执行，程序核 rule 判据
-  kg order done <名字> <步骤> [--note 一句话]   人记一笔（闸门放行也走这里）
-  kg order journal <名字> <一段话>       日志：叙事落产物
-  kg order delete <名字>               删一张白纸：流水非空即拒
+  qtcloud-work order create <名字> --workflow <工作流> [--description 一句话]   开工单
+  qtcloud-work order show <名字>                 读全貌：封面加全量流水，进度照流水推导
+  qtcloud-work order list [--workflow <工作流>] [--json]   列本工作区的工单
+  qtcloud-work order next <名字> [--note 一句话]   走下一步：智能体执行，程序核 rule 判据
+  qtcloud-work order done <名字> <步骤> [--note 一句话]   人记一笔（闸门放行也走这里）
+  qtcloud-work order journal <名字> <一段话>       日志：叙事落产物
+  qtcloud-work order delete <名字>               删一张白纸：流水非空即拒
 
 工作区（实验室自留：规格未规定，按 v1 原样保留）
-  kg catalog [--json 文件]             看目录——按资产表清点工作区里实际有什么
-  kg audit [--json 文件] [--make]      审计——资产表有而工作区无、工作区有而资产表无；--make 补建
-  kg find <名字> [--show]              按名找文档——认文件名与中文标题
-  kg material [路径…] [--json 文件]     看材料——类型、内容、来源、时间，阶段由位置承担
+  qtcloud-work catalog [--json 文件]             看目录——按资产表清点工作区里实际有什么
+  qtcloud-work audit [--json 文件] [--make]      审计——资产表有而工作区无、工作区有而资产表无；--make 补建
+  qtcloud-work find <名字> [--show]              按名找文档——认文件名与中文标题
+  qtcloud-work material [路径…] [--json 文件]     看材料——类型、内容、来源、时间，阶段由位置承担
 
 位置不进模型，由启动参数装载：--root 工作区根（判据基准与扫描面，缺省往上找 data/journal）、
---data 账本仓（工单与产物，缺省本 app 的 data/）、--workflows 定义目录（缺省 <账本仓>/workflows/）。
+--data 账本（身份、工单、产物与事件；缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work，
+指到仓库就等于把它入版控）、--workflows 定义目录（缺省 <账本>/workflows/）。
 v1 的旗标写法也认：`order <名字> --next` 同 `order next <名字>`。
 """
 
@@ -125,10 +126,10 @@ def cmd_material(workspace, args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="kg", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(prog="qtcloud-work", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", help="工作区根（判据基准与工作区级扫描面；缺省从当前目录往上找 data/journal）")
-    parser.add_argument("--data", help="账本仓：工单与产物（草稿）落在这里，缺省本 app 的 data/")
-    parser.add_argument("--workflows", help="定义目录（缺省 <账本仓>/workflows/；固定资产常另指一处）")
+    parser.add_argument("--data", help="账本：身份、工单、产物与事件（缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work）")
+    parser.add_argument("--workflows", help="定义目录（缺省 <账本>/workflows/；固定资产常另指一处）")
     sub = parser.add_subparsers(dest="action", required=True)
 
     flow = sub.add_parser("workflow", help="工作流：一串有序的步骤")

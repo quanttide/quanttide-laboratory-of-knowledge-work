@@ -78,7 +78,7 @@ def workflow_list(workspace) -> Result:
             result.rows.append((payload["name"], names, short(workspace, flow.file_for(workspace, payload["name"]))))
             result.lines.append(f"{payload['name']:24} 步骤：{names}")
         if not found:
-            result.lines = ["还没有工作流：kg workflow create <名字> --steps 甲,乙"]
+            result.lines = ["还没有工作流：qtcloud-work workflow create <名字> --steps 甲,乙"]
         return result
 
     return _guard(action)
@@ -175,7 +175,7 @@ def order_list(workspace, workflow: str = "", as_json: bool = False) -> Result:
             result.rows.append((order.name, order.workflow_name(), workorder.progress(order), step["name"] if step else "走完"))
             result.lines.append(f"{order.name:24} {order.workflow_name()}　{workorder.progress(order)}　下一步：{step['name'] if step else '走完'}")
         if not found:
-            result.lines = ["还没有工单：kg order create <名字> --workflow <工作流>"]
+            result.lines = ["还没有工单：qtcloud-work order create <名字> --workflow <工作流>"]
         return result
 
     return _guard(action)
