@@ -17,7 +17,7 @@ uv pip install -e .                    # 或装成命令：kg
 
 | 动作 | 干什么 |
 |------|--------|
-| `kg workflow create <名字> --steps 甲,乙,丙` | 写一条工作流：步骤带全局 `id`，各写一份判据骨架 |
+| `kg workflow create <名字> --steps 甲,乙,丙` | 写一条工作流：各写一份判据骨架（凭证由工作区按名派生，不落文件） |
 | `kg workflow show <名字>` / `kg workflow list` | 看步骤与判据 / 有哪些工作流 |
 | `kg workflow check <名字>` | 定义核对：判据路径在不在区内、小节有没有判据覆盖 |
 | `kg workflow export <名字> <文件>` / `kg workflow import <文件> [--as 名字]` | 原样存走 / 导进来用（按 schema 验、重名挡） |

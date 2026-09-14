@@ -33,7 +33,7 @@ v1 的每个动作在 v2 都有归属——沿用、收编或明说退役；规�
 
 ```text
 workspace.yaml                 工作区身份：id / name / title / description / created_at / updated_at，缺则首跑生成
-workflows/<工作流>.yaml        定义：id、name、description 与 steps（每步 id / name / description / executor / criteria）
+workflows/<工作流>.yaml        定义：name、description 与 steps（每步 name / description / executor / criteria）；凭证按名派生，不落文件
 workorders/<工单>.yaml         账本：封面（id / name / description / workflow_id / created_at）加内页（records 流水）
 artifacts/<类别>/<工单名>.md    产物按类别分家，按工单名命名
 events.jsonl                   领域事件：WorkflowCreated / WorkOrderCreated / WorkRecorded，一条一行，只增不改

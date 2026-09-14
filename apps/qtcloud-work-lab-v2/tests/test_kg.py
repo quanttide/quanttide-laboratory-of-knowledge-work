@@ -48,6 +48,34 @@ def clone(payload: dict) -> dict:
     return json.loads(json.dumps(payload))
 
 
+def _without_ids(items: list[dict]) -> list[dict]:
+    """把换区时另发的凭证抹掉，只比内容。"""
+    return [{key: value for key, value in item.items() if key != "id"} for item in items]
+
+
+def credentials(tmp: Path) -> None:
+    """凭证：人写的定义不带，读时按「工作区 id + 名字」现算；程序写的账本照旧带。"""
+    with tempfile.TemporaryDirectory() as inner:
+        ws = make(Path(inner), "lab-a")
+        other = make(Path(inner), "lab-b")
+        flow.create(ws, "试一条", ["一步"])
+        raw = flow.load(flow.file_for(ws, "试一条"))
+        test("定义文件不带凭证（也只有名字与内容）", "id" not in raw and "id" not in raw["steps"][0], str(sorted(raw)))
+
+        first = flow.read(ws, "试一条")
+        test("凭证按名派生，两次读一样", ids_layer.is_id(first["id"]) and first["id"] == flow.read(ws, "试一条")["id"])
+        test("步骤凭证也现算", ids_layer.is_id(first["steps"][0]["id"]))
+
+        flow.create(other, "试一条", ["一步"])
+        test("同名跨工作区，凭证不同（各发各的）", first["id"] != flow.read(other, "试一条")["id"])
+
+        order = workorder.create(ws, "试一次", "试一条")
+        test("工单认到派生凭证", order.workflow_id == first["id"])
+        record = workorder.append(order, ids_layer.new_id(), "一步", "做完了", is_succeeded=True)
+        test("记录认到派生凭证", record["step_id"] == first["steps"][0]["id"])
+        test("程序写的工单照旧带凭证", ids_layer.is_id(order.id) and ids_layer.is_id(record["id"]))
+
+
 def identity(tmp: Path) -> None:
     """工作区身份：缺则首跑生成。"""
     with tempfile.TemporaryDirectory() as inner:
@@ -86,7 +114,9 @@ def definition(tmp: Path) -> None:
 
         good = flow.read(ws, "课程档案比对")
         expect_error("schema：顶层多一个字段即报错", flow.WorkflowError, lambda: flow.validate({**good, "extra": 1}))
-        expect_error("schema：少了 id 即报错", flow.WorkflowError, lambda: flow.validate({key: value for key, value in good.items() if key != "id"}))
+        test("schema：不写凭证也合语法（凭证按名派生）", flow.validate({key: value for key, value in good.items() if key != "id"}) is not None)
+        expect_error("schema：凭证写了但不是 UUID 即报错", flow.WorkflowError, lambda: flow.validate({**good, "id": "不是-uuid"}))
+        test("落盘的定义不带凭证", "id" not in flow.load(flow.file_for(ws, "课程档案比对")))
         bad = clone(good)
         bad["steps"][1]["name"] = bad["steps"][0]["name"]
         expect_error("schema：步骤重名即报错", flow.WorkflowError, lambda: flow.validate(bad))
@@ -129,15 +159,14 @@ def carry(tmp: Path) -> None:
         test("导出：文件落地", target.is_file())
         imported = flow.import_(away, target)
         test("导入：落进另一个工作区", flow.file_for(away, "带走的流程").is_file())
-        test("导入：步骤一字不差（凭证原样走）", imported["steps"] == payload["steps"])
+        test("导入：步骤一字不差（凭证各自另发）", _without_ids(imported["steps"]) == _without_ids(payload["steps"]))
         expect_error("导入：重名挡住", FileExistsError, lambda: flow.import_(away, target))
 
         local = make(Path(inner), "local")
         flow.create(local, "带走的流程", ["本地那一版"])
-        expect_error("导入：本地已有同名（不同凭证）也挡住", FileExistsError, lambda: flow.import_(local, target))
+        expect_error("导入：本地已有同名（另一条定义）也挡住", FileExistsError, lambda: flow.import_(local, target))
         test("导入：换名字放行", flow.import_(local, target, "带走的流程·二")["name"] == "带走的流程·二")
-        expect_error("导入：凭证撞号挡住（同一凭证不重发）", flow.WorkflowError, lambda: flow.import_(local, target, "带走的流程·三"))
-        expect_error("导入：不是工作流的文件挡住", flow.WorkflowError, lambda: flow.import_(away, LAB / "README.md"))
+        expect_error("导进来不是工作流的文件挡住", flow.WorkflowError, lambda: flow.import_(away, LAB / "README.md"))
 
 
 def order_and_records(tmp: Path) -> None:
@@ -316,7 +345,7 @@ def workspace_actions(tmp: Path) -> None:
 
 
 def main() -> int:
-    for group in (identity, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions):
+    for group in (identity, credentials, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions):
         with tempfile.TemporaryDirectory() as tmp:
             group(Path(tmp))
 

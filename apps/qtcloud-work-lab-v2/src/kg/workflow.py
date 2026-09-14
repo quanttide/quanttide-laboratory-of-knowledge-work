@@ -6,12 +6,13 @@
 定义要有固定的意义，所以是 YAML 而不是散文：字段名、取值、判据种类都由 schema
 定死，不认识的字段直接报错。落点 `<工作区>/workflows/<名字>.yaml`，文件名即工作流名。
 
-  id: 1f0c…            # 全球凭证，定义侧生成，永不重发；工单的 workflow_id 认它
+定义不带凭证：`id` 可以不写——工作流按「工作区 id + 名字」、步骤按「工作流凭证 + 名字」
+现算（见 ids.py），所以一份定义指到哪个工作区都能直接跑；写了就照写的用（旧文件兼容）。
+
   name: 课程档案比对
   description: 比对两边的档案
   steps:
-    - id: 8a31…        # 步骤的全球凭证
-      name: 定位
+    - name: 定位
       description: 把两边的源找齐
       executor: agent  # agent | human；默认 agent
       criteria:
@@ -39,6 +40,19 @@ AGENT = "agent"
 HUMAN = "human"
 RULE = "rule"
 SECTION = re.compile(r"「([^」]+)」|##\s*([^\s#]+)")
+
+
+def _sections(text: str) -> set[str]:
+    """描述里点到的小节：引号里的短名，或 `##` 起的标题。
+
+    只认干净的名字（全是字词、不长）——引号里带标点的长句是叙述，不是小节名。
+    """
+    found = set()
+    for match in SECTION.finditer(text):
+        name = (match.group(1) or match.group(2)).strip()
+        if name and len(name) <= 10 and re.fullmatch(r"[^\W_]+", name):
+            found.add(name)
+    return found
 
 
 class WorkflowError(ValueError):
@@ -81,11 +95,13 @@ def _validate_step(step, position: int, where: str, seen_ids: set, seen_names: s
     unknown = [key for key in step if key not in STEP_FIELDS]
     if unknown:
         raise WorkflowError(f"{spot}有不认识的字段：{'、'.join(unknown)}（只认 {'、'.join(STEP_FIELDS)}）")
-    if not ids.is_id(step.get("id")):
-        raise WorkflowError(f"{spot}少了 id，或 id 不是 UUID")
-    if step["id"] in seen_ids:
-        raise WorkflowError(f"{spot}的 id 撞号：{step['id']}（步骤 id 全局唯一，永不重发）")
-    seen_ids.add(step["id"])
+    given_id = step.get("id")
+    if given_id is not None and not ids.is_id(given_id):
+        raise WorkflowError(f"{spot}的 id 不是 UUID（不写就按名字派生）")
+    if given_id is not None:
+        if given_id in seen_ids:
+            raise WorkflowError(f"{spot}的 id 撞号：{given_id}（凭证不重发）")
+        seen_ids.add(given_id)
     name = str(step.get("name", "")).strip()
     if not name:
         raise WorkflowError(f"{spot}少了 name")
@@ -111,8 +127,9 @@ def validate(payload, where: str = "定义") -> dict:
     unknown = [key for key in payload if key not in TOP_FIELDS]
     if unknown:
         raise WorkflowError(f"{where}顶层有不认识的字段：{'、'.join(unknown)}（只认 {'、'.join(TOP_FIELDS)}）")
-    if not ids.is_id(payload.get("id")):
-        raise WorkflowError(f"{where}少了 id，或 id 不是 UUID（全球凭证，定义侧生成）")
+    given_id = payload.get("id")
+    if given_id is not None and not ids.is_id(given_id):
+        raise WorkflowError(f"{where}的 id 不是 UUID（不写就按名字派生）")
     if not str(payload.get("name", "")).strip():
         raise WorkflowError(f"{where}少了 name")
     steps = payload.get("steps")
@@ -135,6 +152,32 @@ def load(path: Path) -> dict:
     return validate(payload, where=path.name)
 
 
+def credentials(workspace, payload: dict) -> dict:
+    """把定义里缺的凭证补上：工作流按「工作区 id + 名字」，步骤按「工作流凭证 + 名字」。
+
+    定义文件不带凭证；在人写的那份上不添字，凭证只在读进内存时现算。
+    """
+    filled = dict(payload)
+    if not ids.is_id(filled.get("id")):
+        filled["id"] = ids.derive("workflow", workspace.workspace_id(), str(filled.get("name", "")).strip())
+    steps = []
+    for step in payload.get("steps", []):
+        item = dict(step)
+        if not ids.is_id(item.get("id")):
+            item["id"] = ids.derive("step", filled["id"], str(item.get("name", "")).strip())
+        steps.append(item)
+    filled["steps"] = steps
+    return filled
+
+
+def declared_ids(workspace) -> set[str]:
+    """区内定义里白纸黑字写下的凭证（旧文件兼容）。"""
+    base = workspace.workflows_dir
+    if not base.is_dir():
+        return set()
+    return {payload["id"] for path in sorted(base.glob("*.yaml")) if ids.is_id((payload := load(path)).get("id"))}
+
+
 def file_for(workspace, name: str) -> Path:
     return workspace.workflows_dir / f"{name}.yaml"
 
@@ -147,12 +190,12 @@ def read(workspace, name: str) -> dict:
     path = file_for(workspace, name)
     if not path.is_file():
         raise FileNotFoundError(f"没有这条工作流：{path}")
-    return load(path)
+    return credentials(workspace, load(path))
 
 
 def listing(workspace) -> list[dict]:
     base = workspace.workflows_dir
-    return [load(path) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
+    return [credentials(workspace, load(path)) for path in sorted(base.glob("*.yaml"))] if base.is_dir() else []
 
 
 def by_id(workspace, workflow_id: str) -> dict | None:
@@ -161,7 +204,6 @@ def by_id(workspace, workflow_id: str) -> dict | None:
 
 def _skeleton(name: str) -> dict:
     return {
-        "id": ids.new_id(),
         "name": name,
         "description": f"<{name}这一步做什么>",
         "executor": AGENT,
@@ -173,7 +215,7 @@ def _skeleton(name: str) -> dict:
 
 
 def create(workspace, name: str, steps: list[str], description: str = "") -> dict:
-    """写一条工作流：步骤带全局 id，各写一份判据骨架（写判据 = 写怎么算完）。"""
+    """写一条工作流：步骤各写一份判据骨架（写判据 = 写怎么算完）；凭证不入文件，读时现算。"""
     name = name.strip()
     if not name:
         raise WorkflowError("请先给工作流起个名字")
@@ -183,7 +225,6 @@ def create(workspace, name: str, steps: list[str], description: str = "") -> dic
     if exists(workspace, name):
         raise FileExistsError(f"已经有一条工作流叫「{name}」：{file_for(workspace, name)}")
     payload = {
-        "id": ids.new_id(),
         "name": name,
         "description": description.strip(),
         "steps": [_skeleton(step) for step in steps],
@@ -191,12 +232,12 @@ def create(workspace, name: str, steps: list[str], description: str = "") -> dic
     validate(payload)
     workspace.workflows_dir.mkdir(parents=True, exist_ok=True)
     file_for(workspace, name).write_text(dump(payload), encoding="utf-8")
-    return payload
+    return credentials(workspace, payload)
 
 
 def export(workspace, name: str, target: Path) -> Path:
     """把一条工作流原样存成一份可带走的文件。"""
-    payload = read(workspace, name)
+    payload = load(file_for(workspace, name))
     target = Path(target)
     if target.is_dir():
         target = target / f"{name}.yaml"
@@ -214,11 +255,11 @@ def import_(workspace, source: Path, name: str = "") -> dict:
     payload = dict(payload)
     payload["name"] = chosen
     validate(payload)
-    if by_id(workspace, payload["id"]) is not None:
-        raise WorkflowError(f"区内已有工作流用同一 id：{payload['id']}（凭证不重发，另立新证）")
+    if ids.is_id(payload.get("id")) and payload["id"] in declared_ids(workspace):
+        raise WorkflowError(f"区内已有工作流白纸黑字写着同一 id：{payload['id']}（凭证不重发）")
     workspace.workflows_dir.mkdir(parents=True, exist_ok=True)
     file_for(workspace, chosen).write_text(dump(payload), encoding="utf-8")
-    return payload
+    return credentials(workspace, payload)
 
 
 def steps(payload: dict) -> list[dict]:
@@ -259,7 +300,7 @@ def check(workspace, name: str) -> list[str]:
             for key in ("path", "file"):
                 if key in criterion and not _inside(root, criterion[key]):
                     problems.append(f"{spot}：{key} 不在工作区内——{criterion[key]}")
-        mentioned = {match.group(1) or match.group(2) for match in SECTION.finditer(item["description"])}
+        mentioned = _sections(item["description"])
         covered = {str(criterion.get("contains", "")) for criterion in item.get("criteria", [])}
         for section in sorted(mentioned):
             if not any(section in text for text in covered):
