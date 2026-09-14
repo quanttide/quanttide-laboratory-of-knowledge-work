@@ -4,7 +4,7 @@
 
 ## 数据：账本归 CLI，内容归工作区
 
-**CLI 自己维护的东西（账本）落 CLI 自己的数据目录，不写进任何工作区**：
+**CLI 自己维护的账本落 CLI 自己的数据目录，不写进任何工作区**：
 
 ```text
 $XDG_DATA_HOME/qtcloud-work/            # 缺省 ~/.local/share/qtcloud-work
@@ -12,11 +12,16 @@ $XDG_DATA_HOME/qtcloud-work/            # 缺省 ~/.local/share/qtcloud-work
     ├── workspace.yaml                 工作区身份：id / name / title / description / created_at / updated_at
     ├── workflows/<工作流>.yaml         定义：name、description 与 steps（每步 name / description / executor / criteria）
     ├── workorders/<工单>.yaml          工单：封面（id / name / description / workflow_id / created_at）加流水（records）
-    ├── artifacts/<类别>/<工单名>.md     产物按类别分家，按工单名命名
     └── events.jsonl                   领域事件：WorkflowCreated / WorkOrderCreated / WorkRecorded，一条一行，只增不改
 ```
 
 `<工作区键>` 由工作区根的路径派生（可读名 + 短码）——账本是「这台机器上的这个工作区」的账。
+
+**产物是内容，不跟账本走**，落在工作区里：
+
+```text
+<工作区根>/artifacts/<类别>/<工单名>.md   报告与日志按类别分家，按工单名命名（--artifacts 可另指，如领域仓的草稿区）
+```
 
 **工作区根是人自己的地方**：材料、定义、产物由人放；程序只在点了明确要写的动作时动它。定义要跟工作一起沉底（入版控、可分享），就 `--workflows` 另指一处固定资产目录（如 `data/profile/iGuo/workflows/`）；账本要入版控，就 `--data` 指到仓库。
 

@@ -3,14 +3,16 @@
 规格：工作区（Workspace）只认内容、不认位置——工件在物理上从哪来、落在哪，由平台在
 装载时决定；同一个工作区，资源可以来自多处、任意组合（见 specification/place/workspace.md）。
 
-本 app 的装载分两处：
+本 app 的装载分三处：
 
 - **工作区根（root）**：判据路径的基准、`run` 判据的工作目录、工作区级动作（目录 / 审计 /
   材料 / 找文档）扫描的面；就是人放材料、定义与产物的地方，默认从当前目录往上找到含
   `data/journal` 的第二大脑。
-- **账本（data）**：CLI 自己维护的东西——工作区身份、工单、产物、事件落在这里；默认是
-  CLI 自己的数据目录 `$XDG_DATA_HOME/qtcloud-work/workspaces/<工作区键>/`（见下），
+- **账本（data）**：CLI 自己维护的东西——工作区身份、工单、事件落在这里；默认是 CLI
+  自己的数据目录 `$XDG_DATA_HOME/qtcloud-work/workspaces/<工作区键>/`（见下），
   指到仓库就等于把它入版控（`--data`）。
+- **产物（artifacts）**：报告与日志是**内容**，不跟账本走；默认落在工作区根下的
+  `artifacts/`，由 `--artifacts` 另指（如领域仓的草稿区）。
 
 工作区键由工作区根的路径派生（可读名 + 短码）：账本是「这台机器上的这个工作区」的账。
 工作区身份缺则首跑生成：`id` / `name` / `title` / `description` / `created_at` / `updated_at`。
@@ -73,11 +75,11 @@ def repo_root(start: Path | None = None) -> Path:
     return here
 
 
-def resolve(root=None, data=None, workflows=None) -> "Workspace":
+def resolve(root=None, data=None, workflows=None, artifacts=None) -> "Workspace":
     """装载工作区：位置由启动参数定，缺省按上面的规矩找。"""
     base = Path(root).expanduser() if root else repo_root()
     home = Path(data).expanduser() if data else account(base)
-    return Workspace(base, home, Path(workflows).expanduser() if workflows else None)
+    return Workspace(base, home, Path(workflows).expanduser() if workflows else None, Path(artifacts).expanduser() if artifacts else None)
 
 
 def default_identity(name: str) -> dict:
@@ -86,12 +88,13 @@ def default_identity(name: str) -> dict:
 
 
 class Workspace:
-    """一次装载：根与账本。"""
+    """一次装载：根、账本与产物落点。"""
 
-    def __init__(self, root: Path, data: Path | None = None, workflows: Path | None = None):
+    def __init__(self, root: Path, data: Path | None = None, workflows: Path | None = None, artifacts: Path | None = None):
         self.root = Path(root)
         self.data = Path(data) if data else self.root
         self._workflows = Path(workflows) if workflows else None
+        self._artifacts = Path(artifacts) if artifacts else None
 
     @property
     def identity_file(self) -> Path:
@@ -107,7 +110,8 @@ class Workspace:
 
     @property
     def artifacts_dir(self) -> Path:
-        return self.data / ARTIFACTS
+        """产物是内容，不跟账本走：缺省落在工作区根下。"""
+        return self._artifacts or self.root / ARTIFACTS
 
     @property
     def events_file(self) -> Path:

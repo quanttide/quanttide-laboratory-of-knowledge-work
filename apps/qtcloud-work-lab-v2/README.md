@@ -34,7 +34,8 @@ uv pip install -e .                         # 或装成命令：qtcloud-work
 位置不进模型，由启动参数装载：
 
 - `--root` 工作区根：判据基准与工作区级扫描面，也是人放内容的地方；缺省从当前目录往上找 `data/journal`。
-- `--data` 账本：工作区身份、工单、产物与事件；缺省 CLI 自己的数据目录 `$XDG_DATA_HOME/qtcloud-work`（缺省 `~/.local/share/qtcloud-work`），指到仓库就等于把它入版控。
+- `--data` 账本：工作区身份、工单与事件；缺省 CLI 自己的数据目录 `$XDG_DATA_HOME/qtcloud-work`（缺省 `~/.local/share/qtcloud-work`），指到仓库就等于把它入版控。
+- `--artifacts` 产物落点：报告与日志是内容，不跟账本走；缺省 `<工作区根>/artifacts`，可另指（如领域仓的草稿区）。判据里用 `{{report}}` / `{{journal}}` 指它。
 - `--workflows` 定义目录：缺省 `<账本>/workflows/`；固定资产常另指一处（如 `data/profile/iGuo/workflows/`）。
 
 ## 目录

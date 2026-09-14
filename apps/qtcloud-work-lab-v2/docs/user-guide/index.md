@@ -29,7 +29,7 @@ v1 的每个动作在 v2 都有归属——沿用、收编或明说退役；规�
 
 ## 数据
 
-**账本归 CLI，内容归工作区**：CLI 自己维护的东西落 CLI 自己的数据目录（XDG），不写进工作区；工作区根是人自己的地方，只由人放东西。
+**账本归 CLI，内容归工作区**：CLI 自己维护的账本落 CLI 自己的数据目录（XDG），不写进工作区；产物是内容，落在工作区里。
 
 ```text
 $XDG_DATA_HOME/qtcloud-work/           # 缺省 ~/.local/share/qtcloud-work
@@ -37,10 +37,15 @@ $XDG_DATA_HOME/qtcloud-work/           # 缺省 ~/.local/share/qtcloud-work
     ├── workspace.yaml                 工作区身份：id / name / title / description / created_at / updated_at，缺则首跑生成
     ├── workflows/<工作流>.yaml        定义：name、description 与 steps；凭证按名派生，不落文件
     ├── workorders/<工单>.yaml         工单：封面加流水（records 内嵌，不另落盘）
-    ├── artifacts/<类别>/<工单名>.md    产物按类别分家，按工单名命名
     └── events.jsonl                   领域事件：WorkflowCreated / WorkOrderCreated / WorkRecorded，一条一行，只增不改
 ```
 
-`<工作区键>` 由工作区根的路径派生（可读名 + 短码）。位置不进模型，由启动参数装载：`--root` 工作区根（判据基准与扫描面）、`--data` 账本（缺省上面那处，指到仓库就等于入版控）、`--workflows` 定义目录（缺省 `<账本>/workflows/`，固定资产常另指一处）。
+工作区里（人自己的地方）：
 
-产物落点由工作区按名字算（算法实验室自定，见[设计](../index.md)·行为差）。
+```text
+artifacts/<类别>/<工单名>.md   报告与日志按类别分家，按工单名命名（--artifacts 可另指，如领域仓的草稿区）
+```
+
+`<工作区键>` 由工作区根的路径派生（可读名 + 短码）。位置不进模型，由启动参数装载：`--root` 工作区根（判据基准与扫描面）、`--data` 账本（缺省上面那处，指到仓库就等于入版控）、`--artifacts` 产物落点（缺省 `<工作区根>/artifacts`）、`--workflows` 定义目录（缺省 `<账本>/workflows/`，固定资产常另指一处）。
+
+判据里用 `{{report}}` / `{{journal}}` 指产物落点——不写死名字，一份定义开多单也不串。

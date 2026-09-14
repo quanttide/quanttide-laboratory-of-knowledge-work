@@ -357,6 +357,9 @@ def account_dir(tmp: Path) -> None:
         test("账本：同一工作区两次装载指同一处", workspace_layer.resolve(root=root).data == ws.data)
         test("账本：换个工作区就换一处", workspace_layer.resolve(root=Path(inner) / "elsewhere").data != ws.data)
         test("账本：--data 指到哪就落哪（入版控的逃生口）", workspace_layer.resolve(root=root, data=Path(inner) / "repo").data == Path(inner) / "repo")
+        test("产物：不跟账本走，缺省落在工作区根下", ws.artifacts_dir == root / "artifacts")
+        test("产物：--artifacts 另指（如领域仓的草稿区）", workspace_layer.resolve(root=root, artifacts=Path(inner) / "draft").artifacts_dir == Path(inner) / "draft")
+        test("产物：账本里不藏产物", not any(child.name == "artifacts" for child in [ws.data] if ws.data.exists()))
 
 
 def landing(tmp: Path) -> None:

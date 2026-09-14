@@ -24,8 +24,9 @@
   qtcloud-work material [路径…] [--json 文件]     看材料——类型、内容、来源、时间，阶段由位置承担
 
 位置不进模型，由启动参数装载：--root 工作区根（判据基准与扫描面，缺省往上找 data/journal）、
---data 账本（身份、工单、产物与事件；缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work，
-指到仓库就等于把它入版控）、--workflows 定义目录（缺省 <账本>/workflows/）。
+--data 账本（身份、工单与事件；缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work，
+指到仓库就等于把它入版控）、--artifacts 产物落点（报告与日志是内容，缺省 <工作区根>/artifacts）、
+--workflows 定义目录（缺省 <账本>/workflows/）。
 v1 的旗标写法也认：`order <名字> --next` 同 `order next <名字>`。
 """
 
@@ -128,7 +129,8 @@ def cmd_material(workspace, args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="qtcloud-work", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", help="工作区根（判据基准与工作区级扫描面；缺省从当前目录往上找 data/journal）")
-    parser.add_argument("--data", help="账本：身份、工单、产物与事件（缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work）")
+    parser.add_argument("--data", help="账本：身份、工单与事件（缺省 CLI 自己的数据目录 $XDG_DATA_HOME/qtcloud-work）")
+    parser.add_argument("--artifacts", help="产物落点：报告与日志（内容，缺省 <工作区根>/artifacts）")
     parser.add_argument("--workflows", help="定义目录（缺省 <账本>/workflows/；固定资产常另指一处）")
     sub = parser.add_subparsers(dest="action", required=True)
 
@@ -185,7 +187,7 @@ HANDLERS = {
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    workspace = workspace_layer.resolve(args.root, args.data, args.workflows)
+    workspace = workspace_layer.resolve(args.root, args.data, args.workflows, args.artifacts)
     return HANDLERS[args.action](workspace, args)
 
 
