@@ -359,10 +359,35 @@ def account_dir(tmp: Path) -> None:
         test("账本：--data 指到哪就落哪（入版控的逃生口）", workspace_layer.resolve(root=root, data=Path(inner) / "repo").data == Path(inner) / "repo")
 
 
+def landing(tmp: Path) -> None:
+    """落点引用：判据里的 `{{report}}` 按这单算，不写死名字。"""
+    with tempfile.TemporaryDirectory() as inner:
+        ws = make(Path(inner))
+        payload = flow.create(ws, "试一条", ["写报告"])
+        payload["steps"][0]["criteria"] = [{"executor": "rule", "description": "报告有结论", "file": "{{report}}", "contains": "## 结论"}]
+        flow.file_for(ws, "试一条").write_text(flow.dump(payload), encoding="utf-8")
+        order = workorder.create(ws, "试一次", "试一条")
+        test("落点：展开到本单的报告", execute.expand(order, "{{report}}").endswith("artifacts/report/试一次.md"))
+        test("落点：定义核对不当死路径", flow.check(ws, "试一条") == [])
+
+        real_ai = execute.run_ai
+        execute.run_ai = lambda prompt, where, timeout=900: (True, "写好了")
+        try:
+            first = actions.order_next(ws, "试一次")
+            test("落点：报告没写就不算过", not first.ok and workorder.progress(workorder.read(ws, "试一次")) == "0/1")
+            path = artifacts.report_path(ws, "试一次")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# 报告：试一次\n\n## 结论\n\n了了。\n", encoding="utf-8")
+            second = actions.order_next(ws, "试一次")
+            test("落点：报告写了就算过", second.ok and workorder.finished(workorder.read(ws, "试一次")))
+        finally:
+            execute.run_ai = real_ai
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as xdg:
         os.environ["XDG_DATA_HOME"] = xdg  # 测试一律不碰真 XDG
-        for group in (identity, credentials, definition, check_definition, carry, order_and_records, walking, journal_of_events, command_line, workspace_actions, account_dir):
+        for group in (identity, credentials, definition, check_definition, carry, order_and_records, walking, landing, journal_of_events, command_line, workspace_actions, account_dir):
             with tempfile.TemporaryDirectory() as tmp:
                 group(Path(tmp))
 

@@ -298,7 +298,7 @@ def check(workspace, name: str) -> list[str]:
         spot = item["name"]
         for criterion in item.get("criteria", []):
             for key in ("path", "file"):
-                if key in criterion and not _inside(root, criterion[key]):
+                if key in criterion and "{{" not in str(criterion[key]) and not _inside(root, criterion[key]):
                     problems.append(f"{spot}：{key} 不在工作区内——{criterion[key]}")
         mentioned = _sections(item["description"])
         covered = {str(criterion.get("contains", "")) for criterion in item.get("criteria", [])}

@@ -5,13 +5,35 @@
 闸门不落封面字段：带 `human` 判据的站，只能由人放行（`order done`）。
 """
 
+import re
 import subprocess
 from pathlib import Path
 
+from . import artifacts
 from . import checks as checks_layer
 from . import ids, workorder
 
 TYPES = ("rule", "agent", "human")
+PLACEHOLDER = re.compile(r"\{\{(?P<kind>report|journal)\}\}")
+
+
+def expand(order: workorder.Order, value: str) -> str:
+    """把 `{{report}}` / `{{journal}}` 换成这单的落点。
+
+    落点由工作区按名字算（见 artifacts.py）；落点在区内就按区内相对写，不在区内写绝对的。
+    """
+
+    def one(match: re.Match) -> str:
+        kind = match.group("kind")
+        path = artifacts.report_path(order.workspace, order.name) if kind == "report" else artifacts.journal_path(order.workspace, order.name)
+        return str(path.relative_to(order.workspace.root)) if path.is_relative_to(order.workspace.root) else str(path)
+
+    return PLACEHOLDER.sub(one, value)
+
+
+def expanded(order: workorder.Order, criteria: list[dict]) -> list[dict]:
+    """判据里的落点引用先换成本单的真路径，再去跑。"""
+    return [{key: expand(order, value) if isinstance(value, str) else value for key, value in criterion.items()} for criterion in criteria]
 
 
 def one_line(text: str, limit: int = 80) -> str:
@@ -19,10 +41,10 @@ def one_line(text: str, limit: int = 80) -> str:
     return line[:limit]
 
 
-def criteria_text(step: dict) -> str:
+def criteria_text(order: workorder.Order, step: dict) -> str:
     lines = [
         f"- {criterion.get('executor')}：{checks_layer.description_of(criterion) or criterion.get('description', '')}"
-        for criterion in step.get("criteria", [])
+        for criterion in expanded(order, step.get("criteria", []))
     ]
     return "\n".join(lines) or "（这一步没有判据）"
 
@@ -41,7 +63,7 @@ def prompt_for(order: workorder.Order, step: dict) -> str:
 {step['description']}
 
 判据（程序随后自己核对，你不能改判据、也不许改判据文件）：
-{criteria_text(step)}
+{criteria_text(order, step)}
 
 规矩：数据只写工作区；工作区里只动「做什么」点名的东西。最后用一句话说明你做了什么。
 """
@@ -61,7 +83,7 @@ def run_ai(prompt: str, root: Path, timeout: int = 900) -> tuple[bool, str]:
 
 def judge_prompt(order: workorder.Order, step: dict, criteria: list[dict]) -> str:
     """交给智能体审的那一段话：判准逐条回答。"""
-    listed = "\n".join(f"{index}. {criterion.get('description')}" for index, criterion in enumerate(criteria, start=1))
+    listed = "\n".join(f"{index}. {criterion.get('description')}" for index, criterion in enumerate(expanded(order, criteria), start=1))
     return f"""你是审查者，不是执行者。别改产物、别改判据文件。
 
 工作区：{order.workspace.root}
@@ -116,7 +138,7 @@ def _evaluate(order: workorder.Order, step: dict, note: str, auto: bool) -> tupl
             lines.append("  （没跑成，这一步不算过；修好再来。）")
             return False, lines, [], None
 
-    results, _ = checks_layer.run(root, checks_layer.items_of(rules))
+    results, _ = checks_layer.run(root, checks_layer.items_of(expanded(order, rules)))
     if auto and agents:
         judged = judge_by_ai(order, step, agents)
     else:
@@ -151,9 +173,9 @@ def walk(order: workorder.Order, step: dict, note: str = "") -> tuple[bool, list
 
 def record_by_human(order: workorder.Order, step: dict, note: str = "") -> tuple[bool, list[tuple], dict]:
     """人的路径（`order done`）：闸门放行，或人自己做完记一笔；程序仍核 rule 判据。"""
-    results, _ = checks_layer.run(order.workspace.root, checks_layer.items_of(
-        [item for item in step.get("criteria", []) if item.get("executor") == "rule"]
-    ))
+    results, _ = checks_layer.run(order.workspace.root, checks_layer.items_of(expanded(
+        order, [item for item in step.get("criteria", []) if item.get("executor") == "rule"]
+    )))
     ok = all(passed for _, passed, _ in results)
     detail = note.strip() or ("；".join(item.description for item, _, _ in results) if results else "人记一笔")
     record = workorder.append(order, ids.new_id(), step["name"], detail, is_succeeded=ok)
