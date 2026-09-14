@@ -18,7 +18,7 @@
 | `workflow <名字>` / `--list` | 读取单个 / 列出工作流 | 同名 | 读路径不变 |
 | （v1 无） | 定义核对（规格约束：路径在不在、小节有没有判据覆盖；不访问文件系统，由端侧判） | `workflow <名字> --check` | 新增 |
 | `workflow --export / --import [--as]` | 区间流转（显式导出或导入） | 保留 | 撞名即拒、`--as` 换名，与 v1 同 |
-| `task --new` | 工单已创建；`POST /workspaces/{id}/workorders` | `order --new` | 封面落笔即封；`id`、`workflow_id`、`start_id`、`created_at` 账本方查填，参数带了即拒 |
+| `task --new` | 工单已创建；`POST /workspaces/{id}/workorders` | `order --new` | 封面落笔即封；`id`、`workflow_id`、`created_at` 账本方查填，参数带了即拒 |
 | `task <名字>` / `--list` | 读取工单全貌 / 列出工单（`?workflow_id=` 筛读） | `order <名字>` / `--list` | 全貌 = 封面 + 全量流水；进度与完结由流水推导，不发结论字段 |
 | `task <名字> --next` | 追加工作记录（`POST …/workorders/{name}/records`）+ 判据核对 | `order <名字> --next` | 一步一条工作记录：`id` 追加方生成（幂等键）、`seq` 账本方分配、`step_id` 按 `step` 查填；agent 步骤交给智能体跑，程序核 `rule` 判据 |
 | `task <名字> --done` | 同上（人记一笔） | `order <名字> --done <步骤>` | `is_succeeded` 来源与判据 `executor` 一一对应：`rule` 机械比对、`agent` 智能体审查、`human` 闸门放行；闸门放行落一条记录 |
@@ -32,7 +32,7 @@
 
 ## 行为差（v2 与 v1 不同的地方）
 
-1. **任务改叫工单，封面落笔即封**：`workflow`、`workflow_id`、`start`、`start_id`、`description` 起单后不可改——改任务、换行程，另开工单，旧单留档；流水为空可删，有账不销。v1 那句「中途改工作流等于改了正在跑的任务的规矩」由定义冻结根治。
+1. **任务改叫工单，封面落笔即封**：`workflow`、`workflow_id`、`description` 起单后不可改——改任务、换行程，另开工单，旧单留档；流水为空可删，有账不销。v1 那句「中途改工作流等于改了正在跑的任务的规矩」由定义冻结根治。
 2. **位置不进模型**：v1 任务文件里的 `root` / `data` / `workflows` 三个运行上下文字段删除；工作区根与目录由程序装载时决定（`--root` 等启动参数），工单文件只装内容。
 3. **定义一经引用即冻结**：被工单引用的工作流不可改——改步骤、删步骤、调次序，另立新工作流；未被引用的可随意改（直接改 YAML，程序不设改口）。程序侧拒改：写动作撞上已引用的定义即拒。
 4. **流水字段化**：`log`（`at`/`step`/`detail`/`ok`）→ 工作记录（`id`/`seq`/`created_at`/`order_id`/`step_id`/`description`/`is_succeeded`），只增不改；改结论的唯一方式是追加一条新记录，「以最新一条为准」只是推导规则。
@@ -43,9 +43,9 @@
 ## 里程碑
 
 - **M0 脚手架**：app 目录、`pyproject.toml`（装上即命令）、自带测试骨架（不依赖 pytest，沿 v1）；
-- **M1 模型层**：工作流与工作步骤（严格 schema：不认识的字段报错；步骤 `id` 全局唯一、永不重发）、工单（查填、撞名即拒、有账不销、起点闭环：流水非空时首条对上 `start`）、工作记录（追加幂等、`seq` 自 1 递增不跳号、`step_id` 查填、时间倒序即拒）；工作区身份（`workspace.yaml`：`id`/`name`/`title`/`description`/`created_at`/`updated_at`，缺则首跑生成）；
+- **M1 模型层**：工作流与工作步骤（严格 schema：不认识的字段报错；步骤 `id` 全局唯一、永不重发）、工单（查填、撞名即拒、有账不销）、工作记录（追加幂等、`seq` 自 1 递增不跳号、`step_id` 查填、时间倒序即拒）；工作区身份（`workspace.yaml`：`id`/`name`/`title`/`description`/`created_at`/`updated_at`，缺则首跑生成）；
 - **M2 动作层**：CLI 对表上表全部动作；每个动作在规格端点表里有主——方法、路径、约束逐一核对（无状态、幂等键、撞名即拒、不设 PUT/DELETE）；
-- **M3 事件**：`WorkflowCreated`、`WorkOrderCreated`、`WorkRecorded` 落 JSONL；负载按规格：工单事件带工单 `id` 与 `name`、工作区 `id`、`workflow_id`、`start_id` 及声明全文，记录事件带工单名、记录 `id` 与 `seq`、`step_id` 及记录全文；下游按 `id` 幂等去重；
+- **M3 事件**：`WorkflowCreated`、`WorkOrderCreated`、`WorkRecorded` 落 JSONL；负载按规格：工单事件带工单 `id` 与 `name`、工作区 `id`、`workflow_id` 及声明全文，记录事件带工单名、记录 `id` 与 `seq`、`step_id` 及记录全文；下游按 `id` 幂等去重；
 - **M4 材料与产物**：`material` 四字段收录；报告/日志骨架与核对；产物落点由工作区按名字算（如 `artifacts/<类别>/<工单名>.md`，算法实验室自定）；
 - **M5 窗口**：台面（当前工单：步骤表、流水、执行这一步、写日志）+ 浏览（目录、审计、找文档、材料）；
 - **M6 毕业**：对表全绿、测试守着、真事跑一遍（沿用 v1 的毕业条件）。
