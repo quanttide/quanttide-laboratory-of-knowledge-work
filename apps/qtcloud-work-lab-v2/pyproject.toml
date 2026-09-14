@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qtcloud-work-lab-v2"
+version = "0.2.0"
+description = "量潮知识工作实验室 v2：按规格重写的工作流与工单"
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6"]
+
+[project.scripts]
+kg = "kg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
